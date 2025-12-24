@@ -1,9 +1,10 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.entity.LifeRecord;
 import com.health.entity.User;
-import com.health.repository.LifeRecordRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.LifeRecordMapper;
+import com.health.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,8 +23,8 @@ import java.util.List;
 @Slf4j
 public class LifeRecordService {
     
-    private final LifeRecordRepository lifeRecordRepository;
-    private final UserRepository userRepository;
+    private final LifeRecordMapper lifeRecordMapper;
+    private final UserMapper userMapper;
     
     /**
      * 添加饮食记录
@@ -32,11 +33,13 @@ public class LifeRecordService {
     public LifeRecord addDietRecord(Long userId, LocalDate recordDate, LocalTime recordTime,
                                      String mealType, String foodContent, BigDecimal calories,
                                      String mood, String note) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         LifeRecord record = LifeRecord.builder()
-                .user(user)
+                .userId(userId)
                 .recordType("diet")
                 .recordDate(recordDate != null ? recordDate : LocalDate.now())
                 .recordTime(recordTime)
@@ -47,7 +50,8 @@ public class LifeRecordService {
                 .note(note)
                 .build();
         
-        return lifeRecordRepository.save(record);
+        lifeRecordMapper.insert(record);
+        return record;
     }
     
     /**
@@ -58,11 +62,13 @@ public class LifeRecordService {
                                          String exerciseType, Integer durationMinutes,
                                          BigDecimal caloriesBurned, BigDecimal distance,
                                          Integer steps, String mood, String note) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         LifeRecord record = LifeRecord.builder()
-                .user(user)
+                .userId(userId)
                 .recordType("exercise")
                 .recordDate(recordDate != null ? recordDate : LocalDate.now())
                 .recordTime(recordTime)
@@ -75,7 +81,8 @@ public class LifeRecordService {
                 .note(note)
                 .build();
         
-        return lifeRecordRepository.save(record);
+        lifeRecordMapper.insert(record);
+        return record;
     }
     
     /**
@@ -86,11 +93,13 @@ public class LifeRecordService {
                                       LocalTime sleepStart, LocalTime sleepEnd,
                                       BigDecimal sleepDuration, String sleepQuality,
                                       String mood, String note) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         LifeRecord record = LifeRecord.builder()
-                .user(user)
+                .userId(userId)
                 .recordType("sleep")
                 .recordDate(recordDate != null ? recordDate : LocalDate.now())
                 .sleepStart(sleepStart)
@@ -101,7 +110,8 @@ public class LifeRecordService {
                 .note(note)
                 .build();
         
-        return lifeRecordRepository.save(record);
+        lifeRecordMapper.insert(record);
+        return record;
     }
     
     /**
@@ -109,7 +119,11 @@ public class LifeRecordService {
      */
     @Transactional(readOnly = true)
     public List<LifeRecord> getDailyRecords(Long userId, LocalDate date) {
-        return lifeRecordRepository.findByUserIdAndRecordDateOrderByRecordTimeDesc(userId, date);
+        LambdaQueryWrapper<LifeRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LifeRecord::getUserId, userId)
+               .eq(LifeRecord::getRecordDate, date)
+               .orderByDesc(LifeRecord::getRecordTime);
+        return lifeRecordMapper.selectList(wrapper);
     }
     
     /**
@@ -117,7 +131,11 @@ public class LifeRecordService {
      */
     @Transactional(readOnly = true)
     public List<LifeRecord> getRecordsByType(Long userId, String recordType) {
-        return lifeRecordRepository.findByUserIdAndRecordTypeOrderByRecordDateDesc(userId, recordType);
+        LambdaQueryWrapper<LifeRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LifeRecord::getUserId, userId)
+               .eq(LifeRecord::getRecordType, recordType)
+               .orderByDesc(LifeRecord::getRecordDate);
+        return lifeRecordMapper.selectList(wrapper);
     }
     
     /**
@@ -125,7 +143,12 @@ public class LifeRecordService {
      */
     @Transactional(readOnly = true)
     public List<LifeRecord> getRecentRecords(Long userId, String recordType) {
-        return lifeRecordRepository.findTop30ByUserIdAndRecordTypeOrderByRecordDateDesc(userId, recordType);
+        LambdaQueryWrapper<LifeRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LifeRecord::getUserId, userId)
+               .eq(LifeRecord::getRecordType, recordType)
+               .orderByDesc(LifeRecord::getRecordDate)
+               .last("LIMIT 30");
+        return lifeRecordMapper.selectList(wrapper);
     }
     
     /**
@@ -133,22 +156,15 @@ public class LifeRecordService {
      */
     @Transactional
     public void deleteRecord(Long userId, Long recordId) {
-        LifeRecord record = lifeRecordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("记录不存在"));
+        LifeRecord record = lifeRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权删除此记录");
         }
         
-        lifeRecordRepository.delete(record);
+        lifeRecordMapper.deleteById(recordId);
     }
 }
-
-
-
-
-
-
-
-
-

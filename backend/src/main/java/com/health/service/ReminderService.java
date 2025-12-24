@@ -1,9 +1,10 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.entity.HealthReminder;
 import com.health.entity.User;
-import com.health.repository.HealthReminderRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.HealthReminderMapper;
+import com.health.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,8 @@ import java.util.List;
 @Slf4j
 public class ReminderService {
     
-    private final HealthReminderRepository reminderRepository;
-    private final UserRepository userRepository;
+    private final HealthReminderMapper healthReminderMapper;
+    private final UserMapper userMapper;
     
     /**
      * 创建提醒
@@ -30,11 +31,13 @@ public class ReminderService {
     @Transactional
     public HealthReminder createReminder(Long userId, String reminderType, String content,
                                           LocalTime reminderTime, String repeatType, String repeatDays) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         HealthReminder reminder = HealthReminder.builder()
-                .user(user)
+                .userId(userId)
                 .reminderType(reminderType)
                 .content(content)
                 .reminderTime(reminderTime)
@@ -46,7 +49,8 @@ public class ReminderService {
         // 计算下次提醒时间
         reminder.setNextReminderTime(calculateNextReminderTime(reminder));
         
-        return reminderRepository.save(reminder);
+        healthReminderMapper.insert(reminder);
+        return reminder;
     }
     
     /**
@@ -54,7 +58,10 @@ public class ReminderService {
      */
     @Transactional(readOnly = true)
     public List<HealthReminder> getReminders(Long userId) {
-        return reminderRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        LambdaQueryWrapper<HealthReminder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthReminder::getUserId, userId)
+               .orderByDesc(HealthReminder::getCreatedAt);
+        return healthReminderMapper.selectList(wrapper);
     }
     
     /**
@@ -62,7 +69,11 @@ public class ReminderService {
      */
     @Transactional(readOnly = true)
     public List<HealthReminder> getActiveReminders(Long userId) {
-        return reminderRepository.findByUserIdAndEnabledOrderByReminderTimeAsc(userId, true);
+        LambdaQueryWrapper<HealthReminder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthReminder::getUserId, userId)
+               .eq(HealthReminder::getEnabled, true)
+               .orderByAsc(HealthReminder::getReminderTime);
+        return healthReminderMapper.selectList(wrapper);
     }
     
     /**
@@ -72,10 +83,12 @@ public class ReminderService {
     public HealthReminder updateReminder(Long userId, Long reminderId, String content,
                                           LocalTime reminderTime, String repeatType,
                                           String repeatDays, Boolean enabled) {
-        HealthReminder reminder = reminderRepository.findById(reminderId)
-                .orElseThrow(() -> new RuntimeException("提醒不存在"));
+        HealthReminder reminder = healthReminderMapper.selectById(reminderId);
+        if (reminder == null) {
+            throw new RuntimeException("提醒不存在");
+        }
         
-        if (!reminder.getUser().getId().equals(userId)) {
+        if (!reminder.getUserId().equals(userId)) {
             throw new RuntimeException("无权修改此提醒");
         }
         
@@ -88,7 +101,8 @@ public class ReminderService {
         // 重新计算下次提醒时间
         reminder.setNextReminderTime(calculateNextReminderTime(reminder));
         
-        return reminderRepository.save(reminder);
+        healthReminderMapper.updateById(reminder);
+        return reminder;
     }
     
     /**
@@ -96,10 +110,12 @@ public class ReminderService {
      */
     @Transactional
     public HealthReminder toggleReminder(Long userId, Long reminderId) {
-        HealthReminder reminder = reminderRepository.findById(reminderId)
-                .orElseThrow(() -> new RuntimeException("提醒不存在"));
+        HealthReminder reminder = healthReminderMapper.selectById(reminderId);
+        if (reminder == null) {
+            throw new RuntimeException("提醒不存在");
+        }
         
-        if (!reminder.getUser().getId().equals(userId)) {
+        if (!reminder.getUserId().equals(userId)) {
             throw new RuntimeException("无权修改此提醒");
         }
         
@@ -108,7 +124,8 @@ public class ReminderService {
             reminder.setNextReminderTime(calculateNextReminderTime(reminder));
         }
         
-        return reminderRepository.save(reminder);
+        healthReminderMapper.updateById(reminder);
+        return reminder;
     }
     
     /**
@@ -116,14 +133,16 @@ public class ReminderService {
      */
     @Transactional
     public void deleteReminder(Long userId, Long reminderId) {
-        HealthReminder reminder = reminderRepository.findById(reminderId)
-                .orElseThrow(() -> new RuntimeException("提醒不存在"));
+        HealthReminder reminder = healthReminderMapper.selectById(reminderId);
+        if (reminder == null) {
+            throw new RuntimeException("提醒不存在");
+        }
         
-        if (!reminder.getUser().getId().equals(userId)) {
+        if (!reminder.getUserId().equals(userId)) {
             throw new RuntimeException("无权删除此提醒");
         }
         
-        reminderRepository.delete(reminder);
+        healthReminderMapper.deleteById(reminderId);
     }
     
     /**
@@ -145,12 +164,3 @@ public class ReminderService {
         return nextTime;
     }
 }
-
-
-
-
-
-
-
-
-

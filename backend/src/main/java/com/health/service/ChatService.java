@@ -1,15 +1,16 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.dto.chat.ChatRequest;
 import com.health.dto.chat.ChatResponse;
 import com.health.entity.ChatHistory;
 import com.health.entity.MedicalRecord;
 import com.health.entity.User;
 import com.health.entity.UserProfile;
-import com.health.repository.ChatHistoryRepository;
-import com.health.repository.MedicalRecordRepository;
-import com.health.repository.UserProfileRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.ChatHistoryMapper;
+import com.health.mapper.MedicalRecordMapper;
+import com.health.mapper.UserProfileMapper;
+import com.health.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,10 +33,10 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ChatService {
     
-    private final ChatHistoryRepository chatHistoryRepository;
-    private final UserRepository userRepository;
-    private final UserProfileRepository profileRepository;
-    private final MedicalRecordRepository medicalRecordRepository;
+    private final ChatHistoryMapper chatHistoryMapper;
+    private final UserMapper userMapper;
+    private final UserProfileMapper userProfileMapper;
+    private final MedicalRecordMapper medicalRecordMapper;
     private final RestTemplate restTemplate;
     
     @Value("${ai.service.url:http://localhost:8001}")
@@ -46,8 +47,10 @@ public class ChatService {
      */
     @Transactional
     public ChatResponse chat(Long userId, ChatRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         // 生成或使用会话ID
         String sessionId = request.getSessionId();
@@ -57,34 +60,42 @@ public class ChatService {
         
         // 保存用户消息
         ChatHistory userMessage = ChatHistory.builder()
-                .user(user)
+                .userId(userId)
                 .role("user")
                 .content(request.getMessage())
                 .sessionId(sessionId)
                 .build();
-        chatHistoryRepository.save(userMessage);
+        chatHistoryMapper.insert(userMessage);
         
         // 获取用户档案作为上下文
-        UserProfile profile = profileRepository.findByUserId(userId).orElse(null);
+        LambdaQueryWrapper<UserProfile> profileWrapper = new LambdaQueryWrapper<>();
+        profileWrapper.eq(UserProfile::getUserId, userId);
+        UserProfile profile = userProfileMapper.selectOne(profileWrapper);
         
         // 获取用户的病历记录
-        List<MedicalRecord> medicalRecords = medicalRecordRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        LambdaQueryWrapper<MedicalRecord> recordWrapper = new LambdaQueryWrapper<>();
+        recordWrapper.eq(MedicalRecord::getUserId, userId)
+                     .orderByDesc(MedicalRecord::getCreatedAt);
+        List<MedicalRecord> medicalRecords = medicalRecordMapper.selectList(recordWrapper);
         
         // 获取历史对话
-        List<ChatHistory> history = chatHistoryRepository
-                .findByUserIdAndSessionIdOrderByCreatedAtAsc(userId, sessionId);
+        LambdaQueryWrapper<ChatHistory> historyWrapper = new LambdaQueryWrapper<>();
+        historyWrapper.eq(ChatHistory::getUserId, userId)
+                      .eq(ChatHistory::getSessionId, sessionId)
+                      .orderByAsc(ChatHistory::getCreatedAt);
+        List<ChatHistory> history = chatHistoryMapper.selectList(historyWrapper);
         
         // 调用 AI 服务
         String aiResponse = callAiService(request.getMessage(), profile, medicalRecords, history);
         
         // 保存 AI 响应
         ChatHistory assistantMessage = ChatHistory.builder()
-                .user(user)
+                .userId(userId)
                 .role("assistant")
                 .content(aiResponse)
                 .sessionId(sessionId)
                 .build();
-        chatHistoryRepository.save(assistantMessage);
+        chatHistoryMapper.insert(assistantMessage);
         
         return ChatResponse.builder()
                 .role("assistant")
@@ -99,13 +110,17 @@ public class ChatService {
      */
     @Transactional
     public ChatResponse analyzeRecordImage(Long userId, Long recordId, String message) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
-        MedicalRecord record = medicalRecordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权访问此病历");
         }
         
@@ -114,7 +129,9 @@ public class ChatService {
         }
         
         // 获取用户档案
-        UserProfile profile = profileRepository.findByUserId(userId).orElse(null);
+        LambdaQueryWrapper<UserProfile> profileWrapper = new LambdaQueryWrapper<>();
+        profileWrapper.eq(UserProfile::getUserId, userId);
+        UserProfile profile = userProfileMapper.selectOne(profileWrapper);
         
         // 调用 AI 图片分析
         String aiResponse = callAiImageAnalysis(message, record.getFilePath(), profile);
@@ -256,9 +273,11 @@ public class ChatService {
      */
     @Transactional(readOnly = true)
     public List<ChatResponse> getChatHistory(Long userId, String sessionId) {
-        return chatHistoryRepository
-                .findByUserIdAndSessionIdOrderByCreatedAtAsc(userId, sessionId)
-                .stream()
+        LambdaQueryWrapper<ChatHistory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ChatHistory::getUserId, userId)
+               .eq(ChatHistory::getSessionId, sessionId)
+               .orderByAsc(ChatHistory::getCreatedAt);
+        return chatHistoryMapper.selectList(wrapper).stream()
                 .map(h -> ChatResponse.builder()
                         .role(h.getRole())
                         .content(h.getContent())
@@ -275,7 +294,7 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<com.health.dto.chat.SessionInfo> getSessions(Long userId) {
         // 一次查询获取所有会话信息
-        List<Object[]> results = chatHistoryRepository.findSessionsSummary(userId);
+        List<Object[]> results = chatHistoryMapper.findSessionsSummary(userId);
         
         return results.stream().map(row -> {
             String sessionId = (String) row[0];
@@ -305,6 +324,9 @@ public class ChatService {
      */
     @Transactional
     public void deleteSession(Long userId, String sessionId) {
-        chatHistoryRepository.deleteByUserIdAndSessionId(userId, sessionId);
+        LambdaQueryWrapper<ChatHistory> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ChatHistory::getUserId, userId)
+               .eq(ChatHistory::getSessionId, sessionId);
+        chatHistoryMapper.delete(wrapper);
     }
 }

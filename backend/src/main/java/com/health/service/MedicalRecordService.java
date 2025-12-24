@@ -1,13 +1,14 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.dto.record.RecordRequest;
 import com.health.dto.record.RecordResponse;
 import com.health.entity.MedicalRecord;
 import com.health.entity.MedicalRecordImage;
 import com.health.entity.User;
-import com.health.repository.MedicalRecordImageRepository;
-import com.health.repository.MedicalRecordRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.MedicalRecordImageMapper;
+import com.health.mapper.MedicalRecordMapper;
+import com.health.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,9 +28,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MedicalRecordService {
     
-    private final MedicalRecordRepository recordRepository;
-    private final MedicalRecordImageRepository imageRepository;
-    private final UserRepository userRepository;
+    private final MedicalRecordMapper medicalRecordMapper;
+    private final MedicalRecordImageMapper medicalRecordImageMapper;
+    private final UserMapper userMapper;
     private final OssService ossService;
     
     /**
@@ -37,8 +38,10 @@ public class MedicalRecordService {
      */
     @Transactional(readOnly = true)
     public List<RecordResponse> getRecords(Long userId) {
-        return recordRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .stream()
+        LambdaQueryWrapper<MedicalRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MedicalRecord::getUserId, userId)
+               .orderByDesc(MedicalRecord::getCreatedAt);
+        return medicalRecordMapper.selectList(wrapper).stream()
                 .map(RecordResponse::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -48,10 +51,12 @@ public class MedicalRecordService {
      */
     @Transactional(readOnly = true)
     public RecordResponse getRecord(Long userId, Long recordId) {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权访问此病历");
         }
         
@@ -63,11 +68,13 @@ public class MedicalRecordService {
      */
     @Transactional
     public RecordResponse createRecord(Long userId, RecordRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         MedicalRecord record = MedicalRecord.builder()
-                .user(user)
+                .userId(userId)
                 .title(request.getTitle())
                 .recordType(request.getRecordType())
                 .description(request.getDescription())
@@ -76,7 +83,7 @@ public class MedicalRecordService {
                 .recordDate(request.getRecordDate())
                 .build();
         
-        record = recordRepository.save(record);
+        medicalRecordMapper.insert(record);
         
         return RecordResponse.fromEntity(record);
     }
@@ -86,10 +93,12 @@ public class MedicalRecordService {
      */
     @Transactional
     public RecordResponse uploadFile(Long userId, Long recordId, MultipartFile file) throws IOException {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权操作此病历");
         }
         
@@ -108,7 +117,7 @@ public class MedicalRecordService {
         record.setFileType(file.getContentType());
         record.setFileSize(file.getSize());
         
-        record = recordRepository.save(record);
+        medicalRecordMapper.updateById(record);
         
         return RecordResponse.fromEntity(record);
     }
@@ -132,10 +141,12 @@ public class MedicalRecordService {
      */
     @Transactional
     public RecordResponse updateRecord(Long userId, Long recordId, RecordRequest request) {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权操作此病历");
         }
         
@@ -146,7 +157,7 @@ public class MedicalRecordService {
         if (request.getDoctor() != null) record.setDoctor(request.getDoctor());
         if (request.getRecordDate() != null) record.setRecordDate(request.getRecordDate());
         
-        record = recordRepository.save(record);
+        medicalRecordMapper.updateById(record);
         
         return RecordResponse.fromEntity(record);
     }
@@ -156,10 +167,12 @@ public class MedicalRecordService {
      */
     @Transactional
     public void deleteRecord(Long userId, Long recordId) {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权操作此病历");
         }
         
@@ -169,11 +182,14 @@ public class MedicalRecordService {
         }
         
         // 删除所有关联图片
-        for (MedicalRecordImage image : record.getImages()) {
+        LambdaQueryWrapper<MedicalRecordImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MedicalRecordImage::getRecordId, recordId);
+        List<MedicalRecordImage> images = medicalRecordImageMapper.selectList(wrapper);
+        for (MedicalRecordImage image : images) {
             ossService.deleteFile(image.getFilePath());
         }
         
-        recordRepository.delete(record);
+        medicalRecordMapper.deleteById(recordId);
     }
     
     /**
@@ -181,15 +197,20 @@ public class MedicalRecordService {
      */
     @Transactional
     public RecordResponse addImagesToRecord(Long userId, Long recordId, List<MultipartFile> files) throws IOException {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权操作此病历");
         }
         
-        int currentOrder = record.getImages().size();
+        LambdaQueryWrapper<MedicalRecordImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MedicalRecordImage::getRecordId, recordId);
+        int currentOrder = (int) medicalRecordImageMapper.selectCount(wrapper);
         
+        List<MedicalRecordImage> newImages = new ArrayList<>();
         for (MultipartFile file : files) {
             if (file != null && !file.isEmpty()) {
                 // 上传到 OSS
@@ -198,7 +219,7 @@ public class MedicalRecordService {
                 
                 // 创建图片记录
                 MedicalRecordImage image = MedicalRecordImage.builder()
-                        .record(record)
+                        .recordId(recordId)
                         .filePath(fileUrl)
                         .fileName(file.getOriginalFilename())
                         .fileType(file.getContentType())
@@ -206,20 +227,20 @@ public class MedicalRecordService {
                         .sortOrder(currentOrder++)
                         .build();
                 
-                record.getImages().add(image);
+                medicalRecordImageMapper.insert(image);
+                newImages.add(image);
             }
         }
         
         // 如果是第一张图片，也设置为主图
-        if (record.getFilePath() == null && !record.getImages().isEmpty()) {
-            MedicalRecordImage firstImage = record.getImages().get(0);
+        if (record.getFilePath() == null && !newImages.isEmpty()) {
+            MedicalRecordImage firstImage = newImages.get(0);
             record.setFilePath(firstImage.getFilePath());
             record.setFileName(firstImage.getFileName());
             record.setFileType(firstImage.getFileType());
             record.setFileSize(firstImage.getFileSize());
+            medicalRecordMapper.updateById(record);
         }
-        
-        record = recordRepository.save(record);
         
         return RecordResponse.fromEntity(record);
     }
@@ -229,28 +250,35 @@ public class MedicalRecordService {
      */
     @Transactional
     public RecordResponse deleteImage(Long userId, Long recordId, Long imageId) {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权操作此病历");
         }
         
-        MedicalRecordImage imageToDelete = record.getImages().stream()
-                .filter(img -> img.getId().equals(imageId))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("图片不存在"));
+        MedicalRecordImage imageToDelete = medicalRecordImageMapper.selectById(imageId);
+        if (imageToDelete == null || !imageToDelete.getRecordId().equals(recordId)) {
+            throw new RuntimeException("图片不存在");
+        }
         
         // 删除 OSS 文件
         ossService.deleteFile(imageToDelete.getFilePath());
         
-        // 从列表中移除
-        record.getImages().remove(imageToDelete);
+        // 从数据库中删除
+        medicalRecordImageMapper.deleteById(imageId);
         
         // 如果删除的是主图，更新主图
         if (imageToDelete.getFilePath().equals(record.getFilePath())) {
-            if (!record.getImages().isEmpty()) {
-                MedicalRecordImage newMain = record.getImages().get(0);
+            LambdaQueryWrapper<MedicalRecordImage> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(MedicalRecordImage::getRecordId, recordId)
+                   .orderByAsc(MedicalRecordImage::getSortOrder);
+            List<MedicalRecordImage> remainingImages = medicalRecordImageMapper.selectList(wrapper);
+            
+            if (!remainingImages.isEmpty()) {
+                MedicalRecordImage newMain = remainingImages.get(0);
                 record.setFilePath(newMain.getFilePath());
                 record.setFileName(newMain.getFileName());
                 record.setFileType(newMain.getFileType());
@@ -261,9 +289,8 @@ public class MedicalRecordService {
                 record.setFileType(null);
                 record.setFileSize(null);
             }
+            medicalRecordMapper.updateById(record);
         }
-        
-        record = recordRepository.save(record);
         
         return RecordResponse.fromEntity(record);
     }
@@ -273,13 +300,18 @@ public class MedicalRecordService {
      */
     @Transactional(readOnly = true)
     public List<MedicalRecordImage> getRecordImages(Long userId, Long recordId) {
-        MedicalRecord record = recordRepository.findById(recordId)
-                .orElseThrow(() -> new RuntimeException("病历记录不存在"));
+        MedicalRecord record = medicalRecordMapper.selectById(recordId);
+        if (record == null) {
+            throw new RuntimeException("病历记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权访问此病历");
         }
         
-        return record.getImages();
+        LambdaQueryWrapper<MedicalRecordImage> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MedicalRecordImage::getRecordId, recordId)
+               .orderByAsc(MedicalRecordImage::getSortOrder);
+        return medicalRecordImageMapper.selectList(wrapper);
     }
 }
