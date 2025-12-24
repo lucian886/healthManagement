@@ -208,7 +208,8 @@ public class MedicalRecordService {
         
         LambdaQueryWrapper<MedicalRecordImage> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MedicalRecordImage::getRecordId, recordId);
-        int currentOrder = (int) medicalRecordImageMapper.selectCount(wrapper);
+        Long count = medicalRecordImageMapper.selectCount(wrapper);
+        int currentOrder = count != null ? count.intValue() : 0;
         
         List<MedicalRecordImage> newImages = new ArrayList<>();
         for (MultipartFile file : files) {
