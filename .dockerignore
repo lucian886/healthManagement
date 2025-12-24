@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Logs
+logs/
+*.log
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+target/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads
+uploads/
+
+# Testing
+coverage/
+.pytest_cache/
+
+
+
+

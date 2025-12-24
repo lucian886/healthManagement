@@ -1,0 +1,11 @@
+# Web Framework
+fastapi
+uvicorn
+pydantic-settings
+python-multipart
+
+# AI - 通义千问
+dashscope
+
+# HTTP Client
+httpx

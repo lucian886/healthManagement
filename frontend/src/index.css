@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Noto Sans SC', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #10b981;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+
+/* 动画 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* 聊天消息样式 */
+.chat-bubble {
+  @apply max-w-[80%] rounded-2xl px-4 py-3 shadow-sm;
+}
+
+.chat-bubble-user {
+  @apply bg-gradient-to-br from-primary-500 to-primary-600 text-white ml-auto rounded-br-md;
+}
+
+.chat-bubble-assistant {
+  @apply bg-white border border-gray-100 text-gray-800 mr-auto rounded-bl-md;
+}
+
+/* 数据卡片动画 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+/* 图表柱状图样式 */
+.chart-bar {
+  @apply transition-all duration-300 ease-out;
+}
+
+.chart-bar:hover {
+  filter: brightness(1.1);
+}
+
+/* 表单输入样式增强 */
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+}
+
+/* 健康指标颜色 */
+.health-good { @apply text-green-600 bg-green-100; }
+.health-warning { @apply text-yellow-600 bg-yellow-100; }
+.health-danger { @apply text-red-600 bg-red-100; }
+
+/* 提醒卡片样式 */
+.reminder-card {
+  @apply relative overflow-hidden;
+}
+
+.reminder-card::before {
+  content: '';
+  @apply absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary-400 to-accent-400;
+}
+

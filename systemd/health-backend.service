@@ -1,0 +1,44 @@
+# 健康管理系统 - 后端服务 Systemd 配置
+# 放置位置: /etc/systemd/system/health-backend.service
+# 
+# 安装命令:
+#   sudo cp systemd/health-backend.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable health-backend
+#   sudo systemctl start health-backend
+
+[Unit]
+Description=Health Management Backend Service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/health-management/backend
+
+# 环境变量
+Environment="SPRING_PROFILES_ACTIVE=prod"
+Environment="JAVA_OPTS=-Xms512m -Xmx2g -XX:+UseG1GC"
+
+# 启动命令
+ExecStart=/usr/bin/java -jar ${JAVA_OPTS} /opt/health-management/backend/target/health-management-0.0.1-SNAPSHOT.jar
+
+# 重启策略
+Restart=always
+RestartSec=10
+
+# 日志配置
+StandardOutput=append:/opt/health-management/logs/backend.log
+StandardError=append:/opt/health-management/logs/backend-error.log
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+

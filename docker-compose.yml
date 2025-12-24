@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # AI 服务
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: health-ai-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - HOST=0.0.0.0
+      - PORT=8001
+      - MODEL_NAME=qwen-plus
+    networks:
+      - health-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: health-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://47.94.41.55:5432/health_db
+      - SPRING_DATASOURCE_USERNAME=health_user
+      - SPRING_DATASOURCE_PASSWORD=Health@2024
+      - AI_SERVICE_URL=http://ai-service:8001
+      - JWT_SECRET=aGVhbHRoTWFuYWdlbWVudFNlY3JldEtleUZvckpXVFRva2VuMjAyNFZlcnlTZWN1cmU=
+      - ALIYUN_OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+      - ALIYUN_OSS_BUCKET_NAME=luciantest
+      - ALIYUN_OSS_ACCESS_KEY_ID=${ALIYUN_OSS_ACCESS_KEY_ID}
+      - ALIYUN_OSS_ACCESS_KEY_SECRET=${ALIYUN_OSS_ACCESS_KEY_SECRET}
+    volumes:
+      - backend-uploads:/app/uploads
+    networks:
+      - health-network
+    depends_on:
+      - ai-service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/auth/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: health-frontend
+    ports:
+      - "80:80"
+    networks:
+      - health-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  health-network:
+    driver: bridge
+
+volumes:
+  backend-uploads:
+
+
+
+

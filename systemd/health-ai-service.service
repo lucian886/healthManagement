@@ -1,0 +1,41 @@
+# 健康管理系统 - AI 服务 Systemd 配置
+# 放置位置: /etc/systemd/system/health-ai-service.service
+# 
+# 安装命令:
+#   sudo cp systemd/health-ai-service.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable health-ai-service
+#   sudo systemctl start health-ai-service
+
+[Unit]
+Description=Health Management AI Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/health-management/ai-service
+
+# 环境变量（从文件加载）
+EnvironmentFile=/opt/health-management/.env
+
+# 启动命令
+ExecStart=/usr/bin/python3 /opt/health-management/ai-service/main.py
+
+# 重启策略
+Restart=always
+RestartSec=10
+
+# 日志配置
+StandardOutput=append:/opt/health-management/logs/ai-service.log
+StandardError=append:/opt/health-management/logs/ai-service-error.log
+
+# 资源限制
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
