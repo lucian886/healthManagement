@@ -1,9 +1,10 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.entity.MedicationRecord;
 import com.health.entity.User;
-import com.health.repository.MedicationRecordRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.MedicationRecordMapper;
+import com.health.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,8 @@ import java.util.List;
 @Slf4j
 public class MedicationService {
     
-    private final MedicationRecordRepository medicationRepository;
-    private final UserRepository userRepository;
+    private final MedicationRecordMapper medicationMapper;
+    private final UserMapper userMapper;
     
     /**
      * 添加用药记录
@@ -31,11 +32,13 @@ public class MedicationService {
     public MedicationRecord addMedication(Long userId, String medicationName, String dosage,
                                            String method, String frequency, LocalTime takeTime,
                                            LocalDate startDate, LocalDate endDate, String note) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         MedicationRecord record = MedicationRecord.builder()
-                .user(user)
+                .userId(userId)
                 .medicationName(medicationName)
                 .dosage(dosage)
                 .method(method)
@@ -47,7 +50,8 @@ public class MedicationService {
                 .note(note)
                 .build();
         
-        return medicationRepository.save(record);
+        medicationMapper.insert(record);
+        return record;
     }
     
     /**
@@ -55,7 +59,10 @@ public class MedicationService {
      */
     @Transactional(readOnly = true)
     public List<MedicationRecord> getMedications(Long userId) {
-        return medicationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        LambdaQueryWrapper<MedicationRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MedicationRecord::getUserId, userId)
+               .orderByDesc(MedicationRecord::getCreatedAt);
+        return medicationMapper.selectList(wrapper);
     }
     
     /**
@@ -63,7 +70,11 @@ public class MedicationService {
      */
     @Transactional(readOnly = true)
     public List<MedicationRecord> getActiveMedications(Long userId) {
-        return medicationRepository.findByUserIdAndActiveOrderByCreatedAtDesc(userId, true);
+        LambdaQueryWrapper<MedicationRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MedicationRecord::getUserId, userId)
+               .eq(MedicationRecord::getActive, true)
+               .orderByDesc(MedicationRecord::getCreatedAt);
+        return medicationMapper.selectList(wrapper);
     }
     
     /**
@@ -74,10 +85,12 @@ public class MedicationService {
                                               String dosage, String method, String frequency,
                                               LocalTime takeTime, LocalDate startDate,
                                               LocalDate endDate, Boolean active, String note) {
-        MedicationRecord record = medicationRepository.findById(medicationId)
-                .orElseThrow(() -> new RuntimeException("用药记录不存在"));
+        MedicationRecord record = medicationMapper.selectById(medicationId);
+        if (record == null) {
+            throw new RuntimeException("用药记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权修改此记录");
         }
         
@@ -91,7 +104,8 @@ public class MedicationService {
         if (active != null) record.setActive(active);
         if (note != null) record.setNote(note);
         
-        return medicationRepository.save(record);
+        medicationMapper.updateById(record);
+        return record;
     }
     
     /**
@@ -99,17 +113,20 @@ public class MedicationService {
      */
     @Transactional
     public MedicationRecord stopMedication(Long userId, Long medicationId) {
-        MedicationRecord record = medicationRepository.findById(medicationId)
-                .orElseThrow(() -> new RuntimeException("用药记录不存在"));
+        MedicationRecord record = medicationMapper.selectById(medicationId);
+        if (record == null) {
+            throw new RuntimeException("用药记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权修改此记录");
         }
         
         record.setActive(false);
         record.setEndDate(LocalDate.now());
         
-        return medicationRepository.save(record);
+        medicationMapper.updateById(record);
+        return record;
     }
     
     /**
@@ -117,14 +134,16 @@ public class MedicationService {
      */
     @Transactional
     public void deleteMedication(Long userId, Long medicationId) {
-        MedicationRecord record = medicationRepository.findById(medicationId)
-                .orElseThrow(() -> new RuntimeException("用药记录不存在"));
+        MedicationRecord record = medicationMapper.selectById(medicationId);
+        if (record == null) {
+            throw new RuntimeException("用药记录不存在");
+        }
         
-        if (!record.getUser().getId().equals(userId)) {
+        if (!record.getUserId().equals(userId)) {
             throw new RuntimeException("无权删除此记录");
         }
         
-        medicationRepository.delete(record);
+        medicationMapper.deleteById(medicationId);
     }
 }
 

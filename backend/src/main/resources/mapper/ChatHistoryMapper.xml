@@ -10,5 +10,18 @@
         ORDER BY session_id DESC
     </select>
     
+    <!-- 获取会话摘要信息 -->
+    <select id="findSessionsSummary" resultType="java.lang.Object[]">
+        SELECT 
+            c.session_id,
+            (SELECT content FROM chat_histories WHERE session_id = c.session_id AND user_id = #{userId} AND role = 'user' ORDER BY created_at LIMIT 1) as first_message,
+            MAX(c.created_at) as last_time,
+            COUNT(*) as message_count
+        FROM chat_histories c 
+        WHERE c.user_id = #{userId} 
+        GROUP BY c.session_id 
+        ORDER BY MAX(c.created_at) DESC
+    </select>
+    
 </mapper>
 

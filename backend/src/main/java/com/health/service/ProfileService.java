@@ -1,11 +1,12 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.dto.profile.ProfileRequest;
 import com.health.dto.profile.ProfileResponse;
 import com.health.entity.User;
 import com.health.entity.UserProfile;
-import com.health.repository.UserProfileRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.UserMapper;
+import com.health.mapper.UserProfileMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,16 +18,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProfileService {
     
-    private final UserProfileRepository profileRepository;
-    private final UserRepository userRepository;
+    private final UserProfileMapper userProfileMapper;
+    private final UserMapper userMapper;
     
     /**
      * 获取用户档案
      */
     @Transactional(readOnly = true)
     public ProfileResponse getProfile(Long userId) {
-        UserProfile profile = profileRepository.findByUserId(userId)
-                .orElse(null);
+        LambdaQueryWrapper<UserProfile> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserProfile::getUserId, userId);
+        UserProfile profile = userProfileMapper.selectOne(wrapper);
         
         return ProfileResponse.fromEntity(profile);
     }
@@ -36,11 +38,18 @@ public class ProfileService {
      */
     @Transactional
     public ProfileResponse updateProfile(Long userId, ProfileRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
-        UserProfile profile = profileRepository.findByUserId(userId)
-                .orElseGet(() -> UserProfile.builder().user(user).build());
+        LambdaQueryWrapper<UserProfile> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserProfile::getUserId, userId);
+        UserProfile profile = userProfileMapper.selectOne(wrapper);
+        
+        if (profile == null) {
+            profile = UserProfile.builder().userId(userId).build();
+        }
         
         // 更新档案信息
         if (request.getRealName() != null) profile.setRealName(request.getRealName());
@@ -57,19 +66,12 @@ public class ProfileService {
         if (request.getEmergencyContact() != null) profile.setEmergencyContact(request.getEmergencyContact());
         if (request.getEmergencyPhone() != null) profile.setEmergencyPhone(request.getEmergencyPhone());
         
-        profile = profileRepository.save(profile);
+        if (profile.getId() == null) {
+            userProfileMapper.insert(profile);
+        } else {
+            userProfileMapper.updateById(profile);
+        }
         
         return ProfileResponse.fromEntity(profile);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
