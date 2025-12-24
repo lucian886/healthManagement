@@ -1,5 +1,6 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.dto.auth.AuthResponse;
 import com.health.dto.auth.LoginRequest;
 import com.health.dto.auth.RegisterRequest;
@@ -35,12 +36,16 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         // 检查用户名是否已存在
-        if (userMapper.existsByUsername(request.getUsername())) {
+        LambdaQueryWrapper<User> usernameQuery = new LambdaQueryWrapper<>();
+        usernameQuery.eq(User::getUsername, request.getUsername());
+        if (userMapper.selectCount(usernameQuery) > 0) {
             throw new RuntimeException("用户名已存在");
         }
         
         // 检查邮箱是否已存在
-        if (userMapper.existsByEmail(request.getEmail())) {
+        LambdaQueryWrapper<User> emailQuery = new LambdaQueryWrapper<>();
+        emailQuery.eq(User::getEmail, request.getEmail());
+        if (userMapper.selectCount(emailQuery) > 0) {
             throw new RuntimeException("邮箱已被注册");
         }
         
@@ -86,10 +91,12 @@ public class AuthService {
         String token = tokenProvider.generateToken(authentication);
         
         // 支持用户名或邮箱查找用户
-        User user = userMapper.findByUsername(request.getUsername());
-        if (user == null) {
-            user = userMapper.findByEmail(request.getUsername());
-        }
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(User::getUsername, request.getUsername())
+               .or()
+               .eq(User::getEmail, request.getUsername());
+        User user = userMapper.selectOne(wrapper);
+        
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }

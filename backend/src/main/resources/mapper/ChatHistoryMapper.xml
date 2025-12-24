@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.health.mapper.ChatHistoryMapper">
+    
+    <!-- 获取用户的所有不同会话ID -->
+    <select id="findDistinctSessionIdsByUserId" resultType="java.lang.String">
+        SELECT DISTINCT session_id 
+        FROM chat_histories 
+        WHERE user_id = #{userId} 
+        ORDER BY session_id DESC
+    </select>
+    
+</mapper>
+

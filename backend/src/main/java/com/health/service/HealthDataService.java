@@ -1,9 +1,10 @@
 package com.health.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.health.entity.HealthData;
 import com.health.entity.User;
-import com.health.repository.HealthDataRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.HealthDataMapper;
+import com.health.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,8 +22,8 @@ import java.util.List;
 @Slf4j
 public class HealthDataService {
     
-    private final HealthDataRepository healthDataRepository;
-    private final UserRepository userRepository;
+    private final HealthDataMapper healthDataMapper;
+    private final UserMapper userMapper;
     
     /**
      * 记录健康数据（完整版本）
@@ -31,11 +32,13 @@ public class HealthDataService {
     public HealthData recordData(Long userId, String dataType, String value, String note,
                                   LocalDate recordDate, String recordTime,
                                   Integer systolicPressure, Integer diastolicPressure) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         HealthData data = HealthData.builder()
-                .user(user)
+                .userId(userId)
                 .dataType(dataType)
                 .recordDate(recordDate != null ? recordDate : LocalDate.now())
                 .recordTime(recordTime)
@@ -99,7 +102,8 @@ public class HealthDataService {
                 data.setValue(parseDecimal(value));
         }
         
-        return healthDataRepository.save(data);
+        healthDataMapper.insert(data);
+        return data;
     }
     
     /**
@@ -129,8 +133,13 @@ public class HealthDataService {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays(days);
         
-        return healthDataRepository.findByUserIdAndDataTypeAndRecordDateBetweenOrderByRecordDateAsc(
-                userId, dataType, startDate, endDate);
+        LambdaQueryWrapper<HealthData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthData::getUserId, userId)
+               .eq(HealthData::getDataType, dataType)
+               .between(HealthData::getRecordDate, startDate, endDate)
+               .orderByAsc(HealthData::getRecordDate);
+        
+        return healthDataMapper.selectList(wrapper);
     }
     
     /**
@@ -138,7 +147,13 @@ public class HealthDataService {
      */
     @Transactional(readOnly = true)
     public List<HealthData> getLatestData(Long userId) {
-        return healthDataRepository.findLatestByUserId(userId);
+        // 这个查询比较复杂，需要分组获取每种类型的最新数据
+        // 可以考虑在 Service 层处理或创建专门的 XML 查询
+        LambdaQueryWrapper<HealthData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthData::getUserId, userId)
+               .orderByDesc(HealthData::getRecordDate);
+        
+        return healthDataMapper.selectList(wrapper);
     }
     
     /**
@@ -146,7 +161,11 @@ public class HealthDataService {
      */
     @Transactional(readOnly = true)
     public List<HealthData> getDailyData(Long userId, LocalDate date) {
-        return healthDataRepository.findByUserIdAndRecordDate(userId, date);
+        LambdaQueryWrapper<HealthData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthData::getUserId, userId)
+               .eq(HealthData::getRecordDate, date);
+        
+        return healthDataMapper.selectList(wrapper);
     }
     
     /**
@@ -154,10 +173,13 @@ public class HealthDataService {
      */
     @Transactional(readOnly = true)
     public List<HealthData> getHistory(Long userId, String dataType, int limit) {
-        return healthDataRepository.findByUserIdAndDataTypeOrderByRecordDateDesc(userId, dataType)
-                .stream()
-                .limit(limit)
-                .toList();
+        LambdaQueryWrapper<HealthData> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(HealthData::getUserId, userId)
+               .eq(HealthData::getDataType, dataType)
+               .orderByDesc(HealthData::getRecordDate)
+               .last("LIMIT " + limit);
+        
+        return healthDataMapper.selectList(wrapper);
     }
     
     /**
@@ -165,13 +187,15 @@ public class HealthDataService {
      */
     @Transactional
     public void deleteData(Long userId, Long dataId) {
-        HealthData data = healthDataRepository.findById(dataId)
-                .orElseThrow(() -> new RuntimeException("数据不存在"));
+        HealthData data = healthDataMapper.selectById(dataId);
+        if (data == null) {
+            throw new RuntimeException("数据不存在");
+        }
         
-        if (!data.getUser().getId().equals(userId)) {
+        if (!data.getUserId().equals(userId)) {
             throw new RuntimeException("无权删除此数据");
         }
         
-        healthDataRepository.delete(data);
+        healthDataMapper.deleteById(dataId);
     }
 }
