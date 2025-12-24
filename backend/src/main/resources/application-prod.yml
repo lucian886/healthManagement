@@ -20,16 +20,20 @@ spring:
       connection-test-query: SELECT 1
       keepalive-time: 30000
       validation-timeout: 5000
-  
-  # JPA 配置（生产环境 - 不自动修改表结构）
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    properties:
-      hibernate:
-        format_sql: false
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+# MyBatis Plus 配置（生产环境）
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.health.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
   
   # 文件上传配置
   servlet:

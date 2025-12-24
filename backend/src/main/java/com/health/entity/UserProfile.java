@@ -1,12 +1,10 @@
 package com.health.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,64 +16,61 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "user_profiles")
+@TableName("user_profiles")
 public class UserProfile {
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
     
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true)
-    private User user;
+    @TableField("user_id")
+    private Long userId;
     
     // 基本信息
-    @Column(name = "real_name", length = 50)
+    @TableField("real_name")
     private String realName;
     
-    @Column(length = 10)
+    @TableField("gender")
     private String gender;
     
-    @Column(name = "birth_date")
+    @TableField("birth_date")
     private LocalDate birthDate;
     
-    @Column(length = 20)
+    @TableField("phone")
     private String phone;
     
-    @Column(length = 200)
+    @TableField("address")
     private String address;
     
     // 健康信息
+    @TableField("height")
     private Double height;  // 身高 cm
     
+    @TableField("weight")
     private Double weight;  // 体重 kg
     
-    @Column(name = "blood_type", length = 10)
+    @TableField("blood_type")
     private String bloodType;
     
-    @Column(columnDefinition = "TEXT")
+    @TableField("allergies")
     private String allergies;  // 过敏史
     
-    @Column(name = "medical_history", columnDefinition = "TEXT")
+    @TableField("medical_history")
     private String medicalHistory;  // 病史
     
-    @Column(name = "family_history", columnDefinition = "TEXT")
+    @TableField("family_history")
     private String familyHistory;  // 家族病史
     
     // 紧急联系人
-    @Column(name = "emergency_contact", length = 50)
+    @TableField("emergency_contact")
     private String emergencyContact;
     
-    @Column(name = "emergency_phone", length = 20)
+    @TableField("emergency_phone")
     private String emergencyPhone;
     
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     
-    @UpdateTimestamp
-    @Column(name = "updated_at")
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 }
 

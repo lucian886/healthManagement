@@ -5,8 +5,8 @@ import com.health.dto.auth.LoginRequest;
 import com.health.dto.auth.RegisterRequest;
 import com.health.entity.User;
 import com.health.entity.UserProfile;
-import com.health.repository.UserProfileRepository;
-import com.health.repository.UserRepository;
+import com.health.mapper.UserMapper;
+import com.health.mapper.UserProfileMapper;
 import com.health.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
     
-    private final UserRepository userRepository;
-    private final UserProfileRepository profileRepository;
+    private final UserMapper userMapper;
+    private final UserProfileMapper userProfileMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
@@ -35,12 +35,12 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         // 检查用户名是否已存在
-        if (userRepository.existsByUsername(request.getUsername())) {
+        if (userMapper.existsByUsername(request.getUsername())) {
             throw new RuntimeException("用户名已存在");
         }
         
         // 检查邮箱是否已存在
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userMapper.existsByEmail(request.getEmail())) {
             throw new RuntimeException("邮箱已被注册");
         }
         
@@ -52,13 +52,13 @@ public class AuthService {
                 .enabled(true)
                 .build();
         
-        user = userRepository.save(user);
+        userMapper.insert(user);
         
         // 创建空的用户档案
         UserProfile profile = UserProfile.builder()
-                .user(user)
+                .userId(user.getId())
                 .build();
-        profileRepository.save(profile);
+        userProfileMapper.insert(profile);
         
         // 生成 Token
         String token = tokenProvider.generateToken(user.getId(), user.getUsername());
@@ -86,9 +86,13 @@ public class AuthService {
         String token = tokenProvider.generateToken(authentication);
         
         // 支持用户名或邮箱查找用户
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseGet(() -> userRepository.findByEmail(request.getUsername())
-                        .orElseThrow(() -> new RuntimeException("用户不存在")));
+        User user = userMapper.findByUsername(request.getUsername());
+        if (user == null) {
+            user = userMapper.findByEmail(request.getUsername());
+        }
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
         
         return AuthResponse.builder()
                 .token(token)

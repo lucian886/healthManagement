@@ -1,11 +1,10 @@
 package com.health.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -16,47 +15,32 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "medical_record_images")
+@TableName("medical_record_images")
 public class MedicalRecordImage {
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "record_id", nullable = false)
-    private MedicalRecord record;
+    @TableField("record_id")
+    private Long recordId;
     
     // 文件信息
-    @Column(name = "file_path", nullable = false)
+    @TableField("file_path")
     private String filePath;
     
-    @Column(name = "file_name")
+    @TableField("file_name")
     private String fileName;
     
-    @Column(name = "file_type", length = 50)
+    @TableField("file_type")
     private String fileType;
     
-    @Column(name = "file_size")
+    @TableField("file_size")
     private Long fileSize;
     
     // 排序
-    @Column(name = "sort_order")
+    @TableField("sort_order")
     private Integer sortOrder;
     
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }
-
-
-
-
-
-
-
-
-
-
-

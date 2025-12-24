@@ -1,12 +1,10 @@
 package com.health.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -19,72 +17,58 @@ import java.time.LocalTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "medication_records")
+@TableName("medication_records")
 public class MedicationRecord {
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @TableField("user_id")
+    private Long userId;
     
     // 药品名称
-    @Column(name = "medication_name", nullable = false, length = 100)
+    @TableField("medication_name")
     private String medicationName;
     
     // 剂量
-    @Column(length = 50)
+    @TableField("dosage")
     private String dosage;
     
     // 用法 (口服、注射、外用等)
-    @Column(length = 50)
+    @TableField("method")
     private String method;
     
     // 频率 (每日一次、每日两次等)
-    @Column(length = 50)
+    @TableField("frequency")
     private String frequency;
     
     // 服药时间
-    @Column(name = "take_time")
+    @TableField("take_time")
     private LocalTime takeTime;
     
     // 开始日期
-    @Column(name = "start_date")
+    @TableField("start_date")
     private LocalDate startDate;
     
     // 结束日期
-    @Column(name = "end_date")
+    @TableField("end_date")
     private LocalDate endDate;
     
     // 是否正在服用
-    @Column(nullable = false)
+    @TableField("active")
     private Boolean active = true;
     
     // 备注
-    @Column(length = 500)
+    @TableField("note")
     private String note;
     
     // 提醒关联
-    @Column(name = "reminder_id")
+    @TableField("reminder_id")
     private Long reminderId;
     
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     
-    @UpdateTimestamp
-    @Column(name = "updated_at")
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 }
-
-
-
-
-
-
-
-
-

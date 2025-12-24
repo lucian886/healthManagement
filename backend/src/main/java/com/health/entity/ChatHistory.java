@@ -1,11 +1,10 @@
 package com.health.entity;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -16,31 +15,27 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "chat_histories")
+@TableName("chat_histories")
 public class ChatHistory {
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
     
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @TableField("user_id")
+    private Long userId;
     
     // 对话内容
-    @Column(nullable = false, length = 20)
+    @TableField("role")
     private String role;  // user / assistant
     
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @TableField("content")
     private String content;
     
     // 会话ID，用于区分不同对话
-    @Column(name = "session_id", length = 50)
+    @TableField("session_id")
     private String sessionId;
     
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }
 
