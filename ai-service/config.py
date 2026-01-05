@@ -4,16 +4,17 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """应用配置"""
-    # API 配置
-    dashscope_api_key: str = os.getenv("DASHSCOPE_API_KEY", "")
+    # DeepSeek API 配置
+    deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
+    deepseek_base_url: str = "https://api.deepseek.com"
     
     # 服务配置
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8001"))
     
     # 模型配置
-    model_name: str = os.getenv("MODEL_NAME", "qwen-plus")
-    vision_model_name: str = "qwen-vl-plus"
+    model_name: str = os.getenv("MODEL_NAME", "deepseek-chat")
+    vision_model_name: str = os.getenv("VISION_MODEL_NAME", "deepseek-vl")
     
     # 温度参数
     temperature: float = 0.7

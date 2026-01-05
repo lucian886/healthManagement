@@ -23,11 +23,13 @@
 - 🔍 病历搜索和筛选
 
 ### 🤖 AI 智能助手
-- 💬 基于通义千问的智能健康咨询
-- 🖼️ 医疗图像AI分析（VL-Chat模型）
+- 💬 基于 DeepSeek 的智能健康咨询
+- 🖼️ 医疗图像AI分析（DeepSeek-VL 模型）
+- 🌊 流式输出（实时响应）
 - 📱 多轮对话支持
 - 🧠 上下文理解（结合用户档案和病历）
 - 📚 会话历史管理
+- 🔧 Function Calling 智能工具调用
 
 ## 🏗️ 项目架构
 
@@ -86,8 +88,11 @@ healthManagement/
 
 ### AI 服务 (Python 3.11+)
 - **Web框架**: FastAPI
-- **AI框架**: LangChain
-- **大模型**: 阿里云通义千问 (qwen-plus, qwen-vl-chat-v1)
+- **文本模型**: DeepSeek (deepseek-chat)
+- **视觉模型**: DeepSeek-VL (deepseek-vl)
+- **API**: OpenAI 兼容接口
+- **流式输出**: ✅ 已启用
+- **图片分析**: ✅ 已启用
 - **HTTP客户端**: HTTPX
 - **数据验证**: Pydantic
 
@@ -129,8 +134,8 @@ cp env.example .env
 编辑 `.env` 文件，配置以下必需的环境变量：
 
 ```bash
-# AI 服务配置
-DASHSCOPE_API_KEY=your_dashscope_api_key
+# AI 服务配置（DeepSeek）
+DEEPSEEK_API_KEY=your_deepseek_api_key
 
 # 阿里云 OSS 配置
 ALIYUN_OSS_ACCESS_KEY_ID=your_access_key_id
@@ -306,18 +311,29 @@ npm run build
 - ✅ 多轮对话上下文理解
 - ✅ 健康指标解读（BMI、血压、血糖等）
 - ✅ 健康建议生成
+- ✅ 流式输出（实时响应）
 
-### 图像识别能力
+### 图像识别能力（DeepSeek-VL）
 - ✅ 医疗报告图片识别
-- ✅ 检查结果解读
-- ✅ 处方单识别
-- ✅ 结合用户信息的综合分析
+- ✅ 检查结果智能解读
+- ✅ 化验单数据提取
+- ✅ 多图片批量分析
+- ✅ 结合用户信息的综合评估
 
-### 内置工具
-智能体配备了以下工具：
-- 📊 BMI 计算器
-- 🔥 每日热量需求计算器
-- 💪 健康建议生成器
+### 智能工具调用（Function Calling）
+智能体配备了 18+ 专业工具：
+- 📋 病历管理：查询、统计、搜索、对比
+- 🖼️ 图片分析：查看、分析病历图片
+- 👤 档案管理：获取用户健康档案
+- 📊 健康计算：BMI、热量、理想体重
+- 🩺 症状分析：分析症状给出建议
+- 💊 药物查询：用法、副作用、禁忌
+- 🏥 科室推荐：根据症状推荐就诊科室
+- 📈 数据记录：记录健康数据
+- 📉 趋势分析：分析健康数据趋势
+- ⏰ 提醒设置：设置健康提醒
+- 📄 报告生成：生成健康摘要报告
+- 🔄 复查建议：根据病历推荐复查计划
 
 ## 🔒 安全特性
 
@@ -426,7 +442,7 @@ pytest
 A: 检查 PostgreSQL 是否运行，数据库是否已创建，`.env` 中的数据库配置是否正确。
 
 ### Q: AI 服务返回错误
-A: 确认 `DASHSCOPE_API_KEY` 是否正确配置，检查网络连接是否正常。
+A: 确认 `DEEPSEEK_API_KEY` 是否正确配置，检查网络连接是否正常，确认 DeepSeek API 额度充足。
 
 ### Q: 文件上传失败
 A: 检查阿里云 OSS 配置是否正确，AccessKey 权限是否足够。
@@ -435,6 +451,14 @@ A: 检查阿里云 OSS 配置是否正确，AccessKey 权限是否足够。
 A: 检查后端服务是否启动，CORS 配置是否正确，前端 API 地址配置是否匹配。
 
 ## 🔄 更新日志
+
+### v3.0.0 (2026-01-05)
+- ✨ AI 模型切换到 DeepSeek（deepseek-chat + deepseek-vl）
+- ✨ 实现流式输出（Server-Sent Events）
+- ✨ 集成 DeepSeek-VL 视觉模型进行图片分析
+- ✨ 优化 Function Calling 工具集（18+ 工具）
+- 🔧 更新 API 接口支持流式响应
+- 📝 更新配置和文档
 
 ### v2.0.0 (2024-12-24)
 - ✨ 完成从 JPA 到 MyBatis Plus 的迁移

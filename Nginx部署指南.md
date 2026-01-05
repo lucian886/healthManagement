@@ -352,3 +352,6 @@ sudo journalctl -u health-backend -u health-ai-service -f
 
 
 
+
+
+

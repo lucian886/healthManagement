@@ -23,6 +23,24 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "view_latest_record",
+            "description": "查看并分析最近一份或指定顺序的病历图片内容。当用户说'看看最近的病历'、'帮我看下最近一份病历内容'、'查看最新的检查报告'等时调用此工具。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "position": {
+                        "type": "string",
+                        "enum": ["latest", "second", "third"],
+                        "description": "要查看的病历位置：latest=最近一份，second=第二份，third=第三份"
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "analyze_medical_image",
             "description": "分析指定病历的医疗图片。当用户想要分析某份病历的检查结果、化验单内容时调用此工具。",
             "parameters": {
@@ -38,24 +56,6 @@ TOOLS = [
                     }
                 },
                 "required": ["record_id"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "view_latest_record",
-            "description": "查看并分析最近一份或指定顺序的病历图片内容。当用户说'看看最近的病历'、'帮我看下最近一份病历内容'、'查看最新的检查报告'等时调用此工具。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "position": {
-                        "type": "string",
-                        "enum": ["latest", "second", "third"],
-                        "description": "要查看的病历位置：latest=最近一份，second=第二份，third=第三份"
-                    }
-                },
-                "required": []
             }
         }
     },
@@ -394,6 +394,8 @@ class ToolExecutor:
         try:
             if tool_name == "get_medical_records":
                 return self._get_medical_records(arguments.get("record_type"))
+            elif tool_name == "view_latest_record":
+                return await self._view_latest_record(arguments.get("position", "latest"))
             elif tool_name == "analyze_medical_image":
                 return await self._analyze_medical_image(
                     arguments.get("record_id"),
@@ -401,8 +403,6 @@ class ToolExecutor:
                 )
             elif tool_name == "analyze_all_images":
                 return await self._analyze_all_images(arguments.get("max_count", 5))
-            elif tool_name == "view_latest_record":
-                return await self._view_latest_record(arguments.get("position", "latest"))
             elif tool_name == "get_user_profile":
                 return self._get_user_profile()
             elif tool_name == "calculate_health_metrics":
@@ -502,34 +502,6 @@ class ToolExecutor:
         
         return "\n".join(result)
     
-    async def _analyze_medical_image(self, record_id: int, analysis_focus: str = "") -> str:
-        """分析指定病历的图片"""
-        if not self.image_analyzer:
-            return "图片分析服务未初始化"
-        
-        # 查找对应的病历
-        record = None
-        for r in self.medical_records:
-            if r.get('id') == record_id:
-                record = r
-                break
-        
-        if not record:
-            return f"未找到 ID 为 {record_id} 的病历记录"
-        
-        image_url = record.get('imageUrl')
-        if not image_url:
-            return f"病历「{record.get('title', '未命名')}」没有上传图片"
-        
-        # 调用图片分析
-        prompt = f"请详细分析这张医疗图片（{record.get('recordType', '检查报告')}）"
-        if analysis_focus:
-            prompt += f"，重点关注：{analysis_focus}"
-        
-        result = await self.image_analyzer(prompt, image_url)
-        
-        return f"🔍 **{record.get('title', '病历')}** 分析结果：\n\n{result}"
-    
     async def _view_latest_record(self, position: str = "latest") -> str:
         """查看并分析最近的病历图片"""
         if not self.image_analyzer:
@@ -581,6 +553,34 @@ class ToolExecutor:
         else:
             return f"📋 **{title}** ({record_type}) 没有上传图片，无法分析内容。\n\n描述: {record.get('description', '无')}"
     
+    async def _analyze_medical_image(self, record_id: int, analysis_focus: str = "") -> str:
+        """分析指定病历的图片"""
+        if not self.image_analyzer:
+            return "图片分析服务未初始化"
+        
+        # 查找对应的病历
+        record = None
+        for r in self.medical_records:
+            if r.get('id') == record_id:
+                record = r
+                break
+        
+        if not record:
+            return f"未找到 ID 为 {record_id} 的病历记录"
+        
+        image_url = record.get('imageUrl')
+        if not image_url:
+            return f"病历「{record.get('title', '未命名')}」没有上传图片"
+        
+        # 调用图片分析
+        prompt = f"请详细分析这张医疗图片（{record.get('recordType', '检查报告')}）"
+        if analysis_focus:
+            prompt += f"，重点关注：{analysis_focus}"
+        
+        result = await self.image_analyzer(prompt, image_url, None)
+        
+        return f"🔍 **{record.get('title', '病历')}** 分析结果：\n\n{result}"
+    
     async def _analyze_all_images(self, max_count: int = 5) -> str:
         """分析所有病历图片"""
         if not self.image_analyzer:
@@ -602,7 +602,7 @@ class ToolExecutor:
             
             try:
                 prompt = f"请简要分析这张{record_type}，指出关键指标和是否有异常。"
-                analysis = await self.image_analyzer(prompt, image_url)
+                analysis = await self.image_analyzer(prompt, image_url, None)
                 results.append({
                     'title': title,
                     'type': record_type,

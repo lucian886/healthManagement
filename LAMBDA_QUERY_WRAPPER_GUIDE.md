@@ -258,3 +258,6 @@ public interface ChatHistoryMapper extends BaseMapper<ChatHistory> {
 - [MyBatis Plus LambdaQueryWrapper 官方文档](https://baomidou.com/pages/10c804/#lambdaquerywrapper)
 - [条件构造器详解](https://baomidou.com/pages/10c804/)
 
+
+
+
