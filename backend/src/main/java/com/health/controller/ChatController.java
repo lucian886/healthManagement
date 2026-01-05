@@ -19,7 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
-public class ChatController {
+public class ChatController extends BaseController {
     
     private final ChatService chatService;
     
@@ -30,7 +30,7 @@ public class ChatController {
     public ResponseEntity<ApiResponse<ChatResponse>> chat(
             @AuthenticationPrincipal UserPrincipal user,
             @Valid @RequestBody ChatRequest request) {
-        ChatResponse response = chatService.chat(user.getId(), request);
+        ChatResponse response = chatService.chat(getCurrentUserId(user), request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -46,7 +46,7 @@ public class ChatController {
             String message = (request != null && request.getMessage() != null) 
                     ? request.getMessage() 
                     : "请详细分析这张医疗图片的内容";
-            ChatResponse response = chatService.analyzeRecordImage(user.getId(), recordId, message);
+            ChatResponse response = chatService.analyzeRecordImage(getCurrentUserId(user), recordId, message);
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
@@ -60,7 +60,7 @@ public class ChatController {
     public ResponseEntity<ApiResponse<List<ChatResponse>>> getChatHistory(
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable String sessionId) {
-        List<ChatResponse> history = chatService.getChatHistory(user.getId(), sessionId);
+        List<ChatResponse> history = chatService.getChatHistory(getCurrentUserId(user), sessionId);
         return ResponseEntity.ok(ApiResponse.success(history));
     }
     
@@ -70,7 +70,7 @@ public class ChatController {
     @GetMapping("/sessions")
     public ResponseEntity<ApiResponse<List<com.health.dto.chat.SessionInfo>>> getSessions(
             @AuthenticationPrincipal UserPrincipal user) {
-        var sessions = chatService.getSessions(user.getId());
+        var sessions = chatService.getSessions(getCurrentUserId(user));
         return ResponseEntity.ok(ApiResponse.success(sessions));
     }
     
@@ -81,7 +81,7 @@ public class ChatController {
     public ResponseEntity<ApiResponse<Void>> deleteSession(
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable String sessionId) {
-        chatService.deleteSession(user.getId(), sessionId);
+        chatService.deleteSession(getCurrentUserId(user), sessionId);
         return ResponseEntity.ok(ApiResponse.success("会话已删除", null));
     }
 }

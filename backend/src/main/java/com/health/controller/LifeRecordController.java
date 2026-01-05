@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/life-records")
 @RequiredArgsConstructor
 @Slf4j
-public class LifeRecordController {
+public class LifeRecordController extends BaseController {
     
     private final LifeRecordService lifeRecordService;
     
@@ -39,7 +39,7 @@ public class LifeRecordController {
             switch (request.getRecordType()) {
                 case "diet":
                     record = lifeRecordService.addDietRecord(
-                            user.getId(),
+                            getCurrentUserId(user),
                             request.getRecordDate(),
                             request.getRecordTime(),
                             request.getMealType(),
@@ -51,7 +51,7 @@ public class LifeRecordController {
                     break;
                 case "exercise":
                     record = lifeRecordService.addExerciseRecord(
-                            user.getId(),
+                            getCurrentUserId(user),
                             request.getRecordDate(),
                             request.getRecordTime(),
                             request.getExerciseType(),
@@ -65,7 +65,7 @@ public class LifeRecordController {
                     break;
                 case "sleep":
                     record = lifeRecordService.addSleepRecord(
-                            user.getId(),
+                            getCurrentUserId(user),
                             request.getRecordDate(),
                             request.getSleepStart(),
                             request.getSleepEnd(),
@@ -93,7 +93,7 @@ public class LifeRecordController {
             @AuthenticationPrincipal UserPrincipal user,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         try {
-            List<LifeRecordResponse> records = lifeRecordService.getDailyRecords(user.getId(), date)
+            List<LifeRecordResponse> records = lifeRecordService.getDailyRecords(getCurrentUserId(user), date)
                     .stream()
                     .map(LifeRecordResponse::from)
                     .collect(Collectors.toList());
@@ -112,7 +112,7 @@ public class LifeRecordController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable String recordType) {
         try {
-            List<LifeRecordResponse> records = lifeRecordService.getRecordsByType(user.getId(), recordType)
+            List<LifeRecordResponse> records = lifeRecordService.getRecordsByType(getCurrentUserId(user), recordType)
                     .stream()
                     .map(LifeRecordResponse::from)
                     .collect(Collectors.toList());
@@ -131,7 +131,7 @@ public class LifeRecordController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable String recordType) {
         try {
-            List<LifeRecordResponse> records = lifeRecordService.getRecentRecords(user.getId(), recordType)
+            List<LifeRecordResponse> records = lifeRecordService.getRecentRecords(getCurrentUserId(user), recordType)
                     .stream()
                     .map(LifeRecordResponse::from)
                     .collect(Collectors.toList());
@@ -150,7 +150,7 @@ public class LifeRecordController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            lifeRecordService.deleteRecord(user.getId(), id);
+            lifeRecordService.deleteRecord(getCurrentUserId(user), id);
             return ApiResponse.success("删除成功");
         } catch (Exception e) {
             log.error("删除记录失败", e);

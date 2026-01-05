@@ -23,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/records")
 @RequiredArgsConstructor
-public class MedicalRecordController {
+public class MedicalRecordController extends BaseController {
     
     private final MedicalRecordService recordService;
     
@@ -33,7 +33,7 @@ public class MedicalRecordController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<RecordResponse>>> getRecords(
             @AuthenticationPrincipal UserPrincipal user) {
-        List<RecordResponse> records = recordService.getRecords(user.getId());
+        List<RecordResponse> records = recordService.getRecords(getCurrentUserId(user));
         return ResponseEntity.ok(ApiResponse.success(records));
     }
     
@@ -45,7 +45,7 @@ public class MedicalRecordController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            RecordResponse record = recordService.getRecord(user.getId(), id);
+            RecordResponse record = recordService.getRecord(getCurrentUserId(user), id);
             return ResponseEntity.ok(ApiResponse.success(record));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
@@ -59,7 +59,7 @@ public class MedicalRecordController {
     public ResponseEntity<ApiResponse<RecordResponse>> createRecord(
             @AuthenticationPrincipal UserPrincipal user,
             @Valid @RequestBody RecordRequest request) {
-        RecordResponse record = recordService.createRecord(user.getId(), request);
+        RecordResponse record = recordService.createRecord(getCurrentUserId(user), request);
         return ResponseEntity.ok(ApiResponse.success("病历创建成功", record));
     }
     
@@ -87,7 +87,7 @@ public class MedicalRecordController {
                 request.setRecordDate(java.time.LocalDate.parse(recordDate));
             }
             
-            RecordResponse record = recordService.createRecordWithFile(user.getId(), request, file);
+            RecordResponse record = recordService.createRecordWithFile(getCurrentUserId(user), request, file);
             return ResponseEntity.ok(ApiResponse.success("病历上传成功", record));
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error("文件上传失败: " + e.getMessage()));
@@ -125,7 +125,7 @@ public class MedicalRecordController {
                 request.setDoctor(doctor);
                 request.setRecordDate(parsedDate);
                 
-                RecordResponse record = recordService.createRecordWithFile(user.getId(), request, file);
+                RecordResponse record = recordService.createRecordWithFile(getCurrentUserId(user), request, file);
                 results.add(record);
             }
             
@@ -144,7 +144,7 @@ public class MedicalRecordController {
             @PathVariable Long id,
             @RequestBody RecordRequest request) {
         try {
-            RecordResponse record = recordService.updateRecord(user.getId(), id, request);
+            RecordResponse record = recordService.updateRecord(getCurrentUserId(user), id, request);
             return ResponseEntity.ok(ApiResponse.success("病历更新成功", record));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
@@ -159,7 +159,7 @@ public class MedicalRecordController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            recordService.deleteRecord(user.getId(), id);
+            recordService.deleteRecord(getCurrentUserId(user), id);
             return ResponseEntity.ok(ApiResponse.success("病历删除成功", null));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
@@ -175,7 +175,7 @@ public class MedicalRecordController {
             @PathVariable Long id,
             @RequestParam("files") List<MultipartFile> files) {
         try {
-            RecordResponse record = recordService.addImagesToRecord(user.getId(), id, files);
+            RecordResponse record = recordService.addImagesToRecord(getCurrentUserId(user), id, files);
             return ResponseEntity.ok(ApiResponse.success("图片添加成功，共 " + files.size() + " 张", record));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(ApiResponse.error("图片添加失败: " + e.getMessage()));
@@ -191,7 +191,7 @@ public class MedicalRecordController {
             @PathVariable Long recordId,
             @PathVariable Long imageId) {
         try {
-            RecordResponse record = recordService.deleteImage(user.getId(), recordId, imageId);
+            RecordResponse record = recordService.deleteImage(getCurrentUserId(user), recordId, imageId);
             return ResponseEntity.ok(ApiResponse.success("图片删除成功", record));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));

@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/medications")
 @RequiredArgsConstructor
 @Slf4j
-public class MedicationController {
+public class MedicationController extends BaseController {
     
     private final MedicationService medicationService;
     
@@ -34,7 +34,7 @@ public class MedicationController {
             @RequestBody MedicationRequest request) {
         try {
             MedicationRecord record = medicationService.addMedication(
-                    user.getId(),
+                    getCurrentUserId(user),
                     request.getMedicationName(),
                     request.getDosage(),
                     request.getMethod(),
@@ -57,7 +57,7 @@ public class MedicationController {
     @GetMapping
     public ApiResponse<?> getMedications(@AuthenticationPrincipal UserPrincipal user) {
         try {
-            List<MedicationResponse> medications = medicationService.getMedications(user.getId())
+            List<MedicationResponse> medications = medicationService.getMedications(getCurrentUserId(user))
                     .stream()
                     .map(MedicationResponse::from)
                     .collect(Collectors.toList());
@@ -74,7 +74,7 @@ public class MedicationController {
     @GetMapping("/active")
     public ApiResponse<?> getActiveMedications(@AuthenticationPrincipal UserPrincipal user) {
         try {
-            List<MedicationResponse> medications = medicationService.getActiveMedications(user.getId())
+            List<MedicationResponse> medications = medicationService.getActiveMedications(getCurrentUserId(user))
                     .stream()
                     .map(MedicationResponse::from)
                     .collect(Collectors.toList());
@@ -95,7 +95,7 @@ public class MedicationController {
             @RequestBody MedicationRequest request) {
         try {
             MedicationRecord record = medicationService.updateMedication(
-                    user.getId(),
+                    getCurrentUserId(user),
                     id,
                     request.getMedicationName(),
                     request.getDosage(),
@@ -122,7 +122,7 @@ public class MedicationController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            MedicationRecord record = medicationService.stopMedication(user.getId(), id);
+            MedicationRecord record = medicationService.stopMedication(getCurrentUserId(user), id);
             return ApiResponse.success(MedicationResponse.from(record));
         } catch (Exception e) {
             log.error("停止用药失败", e);
@@ -138,7 +138,7 @@ public class MedicationController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            medicationService.deleteMedication(user.getId(), id);
+            medicationService.deleteMedication(getCurrentUserId(user), id);
             return ApiResponse.success("删除成功");
         } catch (Exception e) {
             log.error("删除用药记录失败", e);

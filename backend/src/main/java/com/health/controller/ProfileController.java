@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/profile")
 @RequiredArgsConstructor
-public class ProfileController {
+public class ProfileController extends BaseController {
     
     private final ProfileService profileService;
     
@@ -26,7 +26,7 @@ public class ProfileController {
     @GetMapping
     public ResponseEntity<ApiResponse<ProfileResponse>> getProfile(
             @AuthenticationPrincipal UserPrincipal user) {
-        ProfileResponse response = profileService.getProfile(user.getId());
+        ProfileResponse response = profileService.getProfile(getCurrentUserId(user));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
     
@@ -37,7 +37,7 @@ public class ProfileController {
     public ResponseEntity<ApiResponse<ProfileResponse>> updateProfile(
             @AuthenticationPrincipal UserPrincipal user,
             @RequestBody ProfileRequest request) {
-        ProfileResponse response = profileService.updateProfile(user.getId(), request);
+        ProfileResponse response = profileService.updateProfile(getCurrentUserId(user), request);
         return ResponseEntity.ok(ApiResponse.success("档案更新成功", response));
     }
 }

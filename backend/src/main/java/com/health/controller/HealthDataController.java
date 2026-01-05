@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/health-data")
 @RequiredArgsConstructor
 @Slf4j
-public class HealthDataController {
+public class HealthDataController extends BaseController {
     
     private final HealthDataService healthDataService;
     
@@ -36,7 +36,7 @@ public class HealthDataController {
             @RequestBody HealthDataRequest request) {
         try {
             HealthData data = healthDataService.recordData(
-                    user.getId(),
+                    getCurrentUserId(user),
                     request.getDataType(),
                     request.getValue(),
                     request.getNote(),
@@ -58,7 +58,7 @@ public class HealthDataController {
     @GetMapping("/latest")
     public ApiResponse<?> getLatestData(@AuthenticationPrincipal UserPrincipal user) {
         try {
-            List<HealthDataResponse> data = healthDataService.getLatestData(user.getId())
+            List<HealthDataResponse> data = healthDataService.getLatestData(getCurrentUserId(user))
                     .stream()
                     .map(HealthDataResponse::from)
                     .collect(Collectors.toList());
@@ -78,7 +78,7 @@ public class HealthDataController {
             @PathVariable String dataType,
             @RequestParam(defaultValue = "30") int days) {
         try {
-            List<HealthDataResponse> data = healthDataService.getTrend(user.getId(), dataType, days)
+            List<HealthDataResponse> data = healthDataService.getTrend(getCurrentUserId(user), dataType, days)
                     .stream()
                     .map(HealthDataResponse::from)
                     .collect(Collectors.toList());
@@ -97,7 +97,7 @@ public class HealthDataController {
             @AuthenticationPrincipal UserPrincipal user,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         try {
-            List<HealthDataResponse> data = healthDataService.getDailyData(user.getId(), date)
+            List<HealthDataResponse> data = healthDataService.getDailyData(getCurrentUserId(user), date)
                     .stream()
                     .map(HealthDataResponse::from)
                     .collect(Collectors.toList());
@@ -117,7 +117,7 @@ public class HealthDataController {
             @PathVariable String dataType,
             @RequestParam(defaultValue = "30") int limit) {
         try {
-            List<HealthDataResponse> data = healthDataService.getHistory(user.getId(), dataType, limit)
+            List<HealthDataResponse> data = healthDataService.getHistory(getCurrentUserId(user), dataType, limit)
                     .stream()
                     .map(HealthDataResponse::from)
                     .collect(Collectors.toList());
@@ -136,7 +136,7 @@ public class HealthDataController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            healthDataService.deleteData(user.getId(), id);
+            healthDataService.deleteData(getCurrentUserId(user), id);
             return ApiResponse.success("删除成功");
         } catch (Exception e) {
             log.error("删除数据失败", e);

@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/reminders")
 @RequiredArgsConstructor
 @Slf4j
-public class ReminderController {
+public class ReminderController extends BaseController {
     
     private final ReminderService reminderService;
     
@@ -34,7 +34,7 @@ public class ReminderController {
             @RequestBody ReminderRequest request) {
         try {
             HealthReminder reminder = reminderService.createReminder(
-                    user.getId(),
+                    getCurrentUserId(user),
                     request.getReminderType(),
                     request.getContent(),
                     request.getReminderTime(),
@@ -54,7 +54,7 @@ public class ReminderController {
     @GetMapping
     public ApiResponse<?> getReminders(@AuthenticationPrincipal UserPrincipal user) {
         try {
-            List<ReminderResponse> reminders = reminderService.getReminders(user.getId())
+            List<ReminderResponse> reminders = reminderService.getReminders(getCurrentUserId(user))
                     .stream()
                     .map(ReminderResponse::from)
                     .collect(Collectors.toList());
@@ -71,7 +71,7 @@ public class ReminderController {
     @GetMapping("/active")
     public ApiResponse<?> getActiveReminders(@AuthenticationPrincipal UserPrincipal user) {
         try {
-            List<ReminderResponse> reminders = reminderService.getActiveReminders(user.getId())
+            List<ReminderResponse> reminders = reminderService.getActiveReminders(getCurrentUserId(user))
                     .stream()
                     .map(ReminderResponse::from)
                     .collect(Collectors.toList());
@@ -92,7 +92,7 @@ public class ReminderController {
             @RequestBody ReminderRequest request) {
         try {
             HealthReminder reminder = reminderService.updateReminder(
-                    user.getId(),
+                    getCurrentUserId(user),
                     id,
                     request.getContent(),
                     request.getReminderTime(),
@@ -115,7 +115,7 @@ public class ReminderController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            HealthReminder reminder = reminderService.toggleReminder(user.getId(), id);
+            HealthReminder reminder = reminderService.toggleReminder(getCurrentUserId(user), id);
             return ApiResponse.success(ReminderResponse.from(reminder));
         } catch (Exception e) {
             log.error("切换提醒状态失败", e);
@@ -131,7 +131,7 @@ public class ReminderController {
             @AuthenticationPrincipal UserPrincipal user,
             @PathVariable Long id) {
         try {
-            reminderService.deleteReminder(user.getId(), id);
+            reminderService.deleteReminder(getCurrentUserId(user), id);
             return ApiResponse.success("删除成功");
         } catch (Exception e) {
             log.error("删除提醒失败", e);
