@@ -222,43 +222,9 @@ class HealthAgent:
     ) -> str:
         """使用 DeepSeek-VL 分析图片"""
         try:
-            # 构建上下文
-            context = ""
-            if user_profile:
-                context = f"\n\n用户信息：性别={user_profile.get('gender', '未知')}, 年龄={user_profile.get('birthDate', '未知')}"
-            
-            full_message = f"{message}{context}"
-            
-            # 构建多模态消息（OpenAI 格式）
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": image_url
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": full_message
-                        }
-                    ]
-                }
-            ]
-            
-            # 调用 DeepSeek-VL 模型
-            response = await client.chat.completions.create(
-                model=settings.vision_model_name,
-                messages=messages,
-                max_tokens=settings.max_tokens
-            )
-            
-            if response.choices:
-                return response.choices[0].message.content
-            else:
-                return "抱歉，图片分析服务暂时不可用。"
+            # DeepSeek 暂时不支持视觉模型或需要不同的调用方式
+            # 暂时返回提示信息
+            return "抱歉，DeepSeek 的视觉模型功能暂时不可用。请直接描述病历内容或使用其他方式。"
                 
         except Exception as e:
             print(f"图片分析出错: {e}")
