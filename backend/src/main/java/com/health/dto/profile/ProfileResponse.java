@@ -41,7 +41,7 @@ public class ProfileResponse {
         
         return ProfileResponse.builder()
                 .id(profile.getId())
-                .userId(profile.getUser().getId())
+                .userId(profile.getUserId())
                 .realName(profile.getRealName())
                 .gender(profile.getGender())
                 .birthDate(profile.getBirthDate())

@@ -54,9 +54,13 @@ public class RecordResponse {
     }
     
     public static RecordResponse fromEntity(MedicalRecord record) {
+        return fromEntity(record, null);
+    }
+    
+    public static RecordResponse fromEntity(MedicalRecord record, List<MedicalRecordImage> images) {
         List<ImageInfo> imageList = null;
-        if (record.getImages() != null && !record.getImages().isEmpty()) {
-            imageList = record.getImages().stream()
+        if (images != null && !images.isEmpty()) {
+            imageList = images.stream()
                     .map(img -> ImageInfo.builder()
                             .id(img.getId())
                             .filePath(img.getFilePath())
@@ -70,7 +74,7 @@ public class RecordResponse {
         
         return RecordResponse.builder()
                 .id(record.getId())
-                .userId(record.getUser().getId())
+                .userId(record.getUserId())
                 .title(record.getTitle())
                 .recordType(record.getRecordType())
                 .description(record.getDescription())
