@@ -294,13 +294,13 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<com.health.dto.chat.SessionInfo> getSessions(Long userId) {
         // 一次查询获取所有会话信息
-        List<Object[]> results = chatHistoryMapper.findSessionsSummary(userId);
+        List<Map<String, Object>> results = chatHistoryMapper.findSessionsSummary(userId);
         
         return results.stream().map(row -> {
-            String sessionId = (String) row[0];
-            String firstMessage = (String) row[1];
-            java.sql.Timestamp lastTime = (java.sql.Timestamp) row[2];
-            Number count = (Number) row[3];
+            String sessionId = (String) row.get("sessionId");
+            String firstMessage = (String) row.get("firstMessage");
+            java.sql.Timestamp lastTime = (java.sql.Timestamp) row.get("lastMessageTime");
+            Number count = (Number) row.get("messageCount");
             
             // 生成标题
             String title = "新对话";

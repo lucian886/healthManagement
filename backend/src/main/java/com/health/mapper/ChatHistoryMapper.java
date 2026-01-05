@@ -5,6 +5,7 @@ import com.health.entity.ChatHistory;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 聊天历史Mapper
@@ -19,7 +20,7 @@ public interface ChatHistoryMapper extends BaseMapper<ChatHistory> {
     
     /**
      * 获取会话摘要信息（需要GROUP BY，使用 XML 实现）
-     * 返回: [sessionId, firstMessage, lastTime, messageCount]
+     * 返回: Map {sessionId, firstMessage, lastMessageTime, messageCount}
      */
-    List<Object[]> findSessionsSummary(Long userId);
+    List<Map<String, Object>> findSessionsSummary(Long userId);
 }
