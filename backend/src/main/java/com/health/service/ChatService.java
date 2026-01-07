@@ -24,8 +24,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -395,50 +398,76 @@ public class ChatService {
                 requestBody.put("stream", true);  // 启用流式输出
                 
                 // 调用 AI 服务流式接口
-                Flux<String> stream = webClient.post()
+                Flux<DataBuffer> stream = webClient.post()
                         .uri(aiServiceUrl + "/api/chat")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .accept(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
                         .bodyValue(requestBody)
                         .retrieve()
-                        .bodyToFlux(String.class);
+                        .bodyToFlux(DataBuffer.class);
+                
+                // SSE 行缓冲
+                StringBuilder buffer = new StringBuilder();
                 
                 // 处理流式响应
                 stream.subscribe(
-                        line -> {
+                        dataBuffer -> {
                             try {
-                                // 解析 SSE 格式: data: {...}
-                                if (line.startsWith("data: ")) {
-                                    String jsonData = line.substring(6);
-                                    @SuppressWarnings("unchecked")
-                                    Map<String, Object> data = objectMapper.readValue(jsonData, Map.class);
-                                    
-                                    if (data.containsKey("chunk")) {
-                                        String chunk = (String) data.get("chunk");
-                                        fullResponse.append(chunk);
+                                // 读取数据
+                                String chunk = StandardCharsets.UTF_8.decode(dataBuffer.asByteBuffer()).toString();
+                                DataBufferUtils.release(dataBuffer);
+                                
+                                buffer.append(chunk);
+                                String data = buffer.toString();
+                                
+                                // 按行处理 SSE 数据
+                                String[] lines = data.split("\n");
+                                
+                                // 保留未完成的行
+                                if (!data.endsWith("\n")) {
+                                    buffer = new StringBuilder(lines[lines.length - 1]);
+                                    lines = Arrays.copyOf(lines, lines.length - 1);
+                                } else {
+                                    buffer = new StringBuilder();
+                                }
+                                
+                                // 处理每一行
+                                for (String line : lines) {
+                                    if (line.startsWith("data: ")) {
+                                        String jsonData = line.substring(6).trim();
+                                        if (jsonData.isEmpty()) continue;
                                         
-                                        // 转发给前端
-                                        emitter.send(SseEmitter.event()
-                                                .data(chunk)
-                                                .name("message"));
-                                    }
-                                    
-                                    if (Boolean.TRUE.equals(data.get("done"))) {
-                                        // 保存 AI 响应到数据库
-                                        ChatHistory assistantMessage = ChatHistory.builder()
-                                                .userId(userId)
-                                                .sessionId(sessionId)
-                                                .role("assistant")
-                                                .content(fullResponse.toString())
-                                                .createdAt(LocalDateTime.now())
-                                                .build();
-                                        chatHistoryMapper.insert(assistantMessage);
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> eventData = objectMapper.readValue(jsonData, Map.class);
                                         
-                                        // 完成流式传输
-                                        emitter.complete();
+                                        if (eventData.containsKey("chunk")) {
+                                            String textChunk = (String) eventData.get("chunk");
+                                            fullResponse.append(textChunk);
+                                            
+                                            // 转发给前端
+                                            emitter.send(SseEmitter.event()
+                                                    .data(textChunk)
+                                                    .name("message"));
+                                        }
+                                        
+                                        if (Boolean.TRUE.equals(eventData.get("done"))) {
+                                            // 保存 AI 响应到数据库
+                                            ChatHistory assistantMessage = ChatHistory.builder()
+                                                    .userId(userId)
+                                                    .sessionId(sessionId)
+                                                    .role("assistant")
+                                                    .content(fullResponse.toString())
+                                                    .createdAt(LocalDateTime.now())
+                                                    .build();
+                                            chatHistoryMapper.insert(assistantMessage);
+                                            
+                                            // 完成流式传输
+                                            emitter.complete();
+                                        }
                                     }
                                 }
-                            } catch (IOException e) {
-                                log.error("发送 SSE 数据失败", e);
+                            } catch (Exception e) {
+                                log.error("处理 SSE 数据失败", e);
                                 emitter.completeWithError(e);
                             }
                         },

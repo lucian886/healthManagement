@@ -72,6 +72,7 @@ export const chatApi = {
   // 流式聊天（实时返回）
   sendStream: (data, onChunk, onComplete, onError) => {
     const token = useAuthStore.getState().token
+    let buffer = ''
     
     // 使用 fetch 接收 SSE 流
     fetch('/api/chat', {
@@ -101,12 +102,26 @@ export const chatApi = {
             
             // 解码数据
             const chunk = decoder.decode(value, { stream: true })
+            buffer += chunk
             
-            // 处理 SSE 格式: data: chunk\n\n
-            const lines = chunk.split('\n')
+            // 处理 SSE 格式: data: text\n\n 或 event: message\ndata: text\n\n
+            const lines = buffer.split('\n')
+            
+            // 保留未完成的行
+            if (!buffer.endsWith('\n')) {
+              buffer = lines.pop() || ''
+            } else {
+              buffer = ''
+            }
+            
+            // 处理完整的行
             for (const line of lines) {
-              if (line.trim()) {
-                onChunk && onChunk(line)
+              if (line.startsWith('data: ')) {
+                const eventData = line.substring(6).trim()
+                if (eventData && eventData !== '[DONE]') {
+                  // 直接传递文本内容给回调
+                  onChunk && onChunk(eventData)
+                }
               }
             }
           }
