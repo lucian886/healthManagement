@@ -167,36 +167,92 @@ function Chat() {
     setLoading(true)
     
     try {
-      let response
-      
       if (currentRecord) {
-        response = await chatApi.analyzeRecordImage(currentRecord.id, userInput)
-      } else {
-        response = await chatApi.send({
-          message: userInput,
-          sessionId: sessionId
-        })
-      }
-      
-      if (response.success) {
-        // 更新 sessionId
-        if (response.data.sessionId && !sessionId) {
-          setSessionId(response.data.sessionId)
-          // 刷新会话列表
-          fetchSessions()
+        // 图片分析暂不支持流式
+        const response = await chatApi.analyzeRecordImage(currentRecord.id, userInput)
+        if (response.success) {
+          if (response.data.sessionId && !sessionId) {
+            setSessionId(response.data.sessionId)
+            fetchSessions()
+          }
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: response.data.content,
+            createdAt: response.data.createdAt || new Date().toISOString()
+          }])
         }
-        
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: response.data.content,
-          createdAt: response.data.createdAt || new Date().toISOString()
-        }])
+        setLoading(false)
       } else {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: '抱歉，我暂时无法回答您的问题，请稍后再试。',
-          createdAt: new Date().toISOString()
-        }])
+        // 使用流式输出
+        let streamedContent = ''
+        let assistantMessageIndex = -1
+        
+        // 添加一个占位消息用于实时更新
+        setMessages(prev => {
+          assistantMessageIndex = prev.length
+          return [...prev, {
+            role: 'assistant',
+            content: '',
+            createdAt: new Date().toISOString(),
+            streaming: true
+          }]
+        })
+        
+        chatApi.sendStream(
+          {
+            message: userInput,
+            sessionId: sessionId
+          },
+          // onChunk - 实时接收每个字符
+          (chunk) => {
+            streamedContent += chunk
+            setMessages(prev => {
+              const newMessages = [...prev]
+              if (newMessages[assistantMessageIndex]) {
+                newMessages[assistantMessageIndex] = {
+                  ...newMessages[assistantMessageIndex],
+                  content: streamedContent
+                }
+              }
+              return newMessages
+            })
+          },
+          // onComplete - 流结束
+          () => {
+            setLoading(false)
+            setMessages(prev => {
+              const newMessages = [...prev]
+              if (newMessages[assistantMessageIndex]) {
+                newMessages[assistantMessageIndex] = {
+                  ...newMessages[assistantMessageIndex],
+                  streaming: false
+                }
+              }
+              return newMessages
+            })
+            // 刷新会话列表
+            if (!sessionId) {
+              fetchSessions()
+            }
+          },
+          // onError - 错误处理
+          (error) => {
+            console.error('流式响应错误:', error)
+            setLoading(false)
+            setMessages(prev => {
+              const newMessages = [...prev]
+              if (newMessages[assistantMessageIndex]) {
+                newMessages[assistantMessageIndex] = {
+                  role: 'assistant',
+                  content: streamedContent || '抱歉，服务暂时不可用，请稍后再试。',
+                  createdAt: new Date().toISOString(),
+                  streaming: false
+                }
+              }
+              return newMessages
+            })
+          }
+        )
       }
     } catch (err) {
       console.error('发送消息失败:', err)
@@ -205,7 +261,6 @@ function Chat() {
         content: '抱歉，服务暂时不可用，请稍后再试。',
         createdAt: new Date().toISOString()
       }])
-    } finally {
       setLoading(false)
     }
   }
@@ -394,7 +449,10 @@ function Chat() {
                       </div>
                     )}
                     <p className="whitespace-pre-wrap">{message.content}</p>
-                    {message.createdAt && (
+                    {message.streaming && (
+                      <span className="inline-block w-1 h-4 bg-primary-500 animate-pulse ml-1" />
+                    )}
+                    {message.createdAt && !message.streaming && (
                       <p className="text-xs opacity-50 mt-1 flex items-center gap-1">
                         <Clock size={10} />
                         {formatTime(message.createdAt)}
@@ -404,8 +462,8 @@ function Chat() {
                 </div>
               ))}
               
-              {/* 加载中 */}
-              {loading && (
+              {/* 加载中（非流式状态） */}
+              {loading && !messages.some(m => m.streaming) && (
                 <div className="flex gap-3 animate-fade-in">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center">
                     <Sparkles className="text-white" size={16} />
@@ -413,7 +471,7 @@ function Chat() {
                   <div className="chat-bubble chat-bubble-assistant">
                     <div className="flex items-center gap-2">
                       <Loader2 className="animate-spin text-primary-500" size={16} />
-                      <span className="text-gray-500">智能体正在思考并调用工具...</span>
+                      <span className="text-gray-500">正在连接智能体...</span>
                     </div>
                   </div>
                 </div>

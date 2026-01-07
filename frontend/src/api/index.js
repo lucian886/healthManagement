@@ -69,7 +69,62 @@ export const recordApi = {
 
 // 聊天相关 API
 export const chatApi = {
-  send: (data) => api.post('/chat', data),
+  // 流式聊天（实时返回）
+  sendStream: (data, onChunk, onComplete, onError) => {
+    const token = useAuthStore.getState().token
+    
+    // 使用 fetch 接收 SSE 流
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      
+      const processStream = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              onComplete && onComplete()
+              break
+            }
+            
+            // 解码数据
+            const chunk = decoder.decode(value, { stream: true })
+            
+            // 处理 SSE 格式: data: chunk\n\n
+            const lines = chunk.split('\n')
+            for (const line of lines) {
+              if (line.trim()) {
+                onChunk && onChunk(line)
+              }
+            }
+          }
+        } catch (error) {
+          onError && onError(error)
+        }
+      }
+      
+      processStream()
+    })
+    .catch(error => {
+      onError && onError(error)
+    })
+  },
+  
+  // 非流式聊天（兼容旧版）
+  send: (data) => api.post('/chat/sync', data),
+  
   getHistory: (sessionId) => api.get(`/chat/history/${sessionId}`),
   getSessions: () => api.get('/chat/sessions'),
   deleteSession: (sessionId) => api.delete(`/chat/sessions/${sessionId}`),
