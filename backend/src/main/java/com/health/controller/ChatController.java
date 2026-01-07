@@ -7,9 +7,11 @@ import com.health.security.UserPrincipal;
 import com.health.service.ChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -24,10 +26,21 @@ public class ChatController extends BaseController {
     private final ChatService chatService;
     
     /**
-     * 发送消息
+     * 发送消息（流式输出 - 推荐）
+     * 前端实时接收 AI 生成的内容
      */
-    @PostMapping
-    public ResponseEntity<ApiResponse<ChatResponse>> chat(
+    @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chat(
+            @AuthenticationPrincipal UserPrincipal user,
+            @Valid @RequestBody ChatRequest request) {
+        return chatService.chatStream(getCurrentUserId(user), request);
+    }
+    
+    /**
+     * 发送消息（非流式 - 兼容旧版）
+     */
+    @PostMapping("/sync")
+    public ResponseEntity<ApiResponse<ChatResponse>> chatSync(
             @AuthenticationPrincipal UserPrincipal user,
             @Valid @RequestBody ChatRequest request) {
         ChatResponse response = chatService.chat(getCurrentUserId(user), request);

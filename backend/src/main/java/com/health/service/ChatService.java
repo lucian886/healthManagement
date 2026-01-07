@@ -20,9 +20,15 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +44,8 @@ public class ChatService {
     private final UserProfileMapper userProfileMapper;
     private final MedicalRecordMapper medicalRecordMapper;
     private final RestTemplate restTemplate;
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
     
     @Value("${ai.service.url:http://localhost:8001}")
     private String aiServiceUrl;
@@ -200,6 +208,7 @@ public class ChatService {
                     })
                     .collect(Collectors.toList());
             requestBody.put("history", historyData);
+            requestBody.put("stream", false);  // 非流式接口使用 JSON 响应
             
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             
@@ -328,5 +337,200 @@ public class ChatService {
         wrapper.eq(ChatHistory::getUserId, userId)
                .eq(ChatHistory::getSessionId, sessionId);
         chatHistoryMapper.delete(wrapper);
+    }
+    
+    /**
+     * 流式对话 - 实时返回 AI 生成的内容
+     */
+    public SseEmitter chatStream(Long userId, ChatRequest request) {
+        SseEmitter emitter = new SseEmitter(300000L); // 5分钟超时
+        
+        // 异步处理流式响应
+        CompletableFuture.runAsync(() -> {
+            StringBuilder fullResponse = new StringBuilder();
+            
+            try {
+                // 获取用户和档案信息
+                User user = userMapper.selectById(userId);
+                if (user == null) {
+                    emitter.send(SseEmitter.event()
+                            .data("{\"error\": \"用户不存在\"}")
+                            .name("error"));
+                    emitter.complete();
+                    return;
+                }
+                
+                // 保存用户消息
+                String sessionId = request.getSessionId() != null ? request.getSessionId() : UUID.randomUUID().toString();
+                ChatHistory userMessage = ChatHistory.builder()
+                        .userId(userId)
+                        .sessionId(sessionId)
+                        .role("user")
+                        .content(request.getMessage())
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                chatHistoryMapper.insert(userMessage);
+                
+                // 获取用户档案和病历
+                LambdaQueryWrapper<UserProfile> profileWrapper = new LambdaQueryWrapper<>();
+                profileWrapper.eq(UserProfile::getUserId, userId);
+                UserProfile profile = userProfileMapper.selectOne(profileWrapper);
+                
+                LambdaQueryWrapper<MedicalRecord> recordsWrapper = new LambdaQueryWrapper<>();
+                recordsWrapper.eq(MedicalRecord::getUserId, userId)
+                             .orderByDesc(MedicalRecord::getCreatedAt)
+                             .last("LIMIT 10");
+                List<MedicalRecord> records = medicalRecordMapper.selectList(recordsWrapper);
+                
+                // 获取对话历史
+                LambdaQueryWrapper<ChatHistory> historyWrapper = new LambdaQueryWrapper<>();
+                historyWrapper.eq(ChatHistory::getUserId, userId)
+                             .eq(ChatHistory::getSessionId, sessionId)
+                             .orderByAsc(ChatHistory::getCreatedAt)
+                             .last("LIMIT 20");
+                List<ChatHistory> history = chatHistoryMapper.selectList(historyWrapper);
+                
+                // 构建请求体
+                Map<String, Object> requestBody = buildAiRequest(request.getMessage(), profile, records, history);
+                requestBody.put("stream", true);  // 启用流式输出
+                
+                // 调用 AI 服务流式接口
+                Flux<String> stream = webClient.post()
+                        .uri(aiServiceUrl + "/api/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToFlux(String.class);
+                
+                // 处理流式响应
+                stream.subscribe(
+                        line -> {
+                            try {
+                                // 解析 SSE 格式: data: {...}
+                                if (line.startsWith("data: ")) {
+                                    String jsonData = line.substring(6);
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> data = objectMapper.readValue(jsonData, Map.class);
+                                    
+                                    if (data.containsKey("chunk")) {
+                                        String chunk = (String) data.get("chunk");
+                                        fullResponse.append(chunk);
+                                        
+                                        // 转发给前端
+                                        emitter.send(SseEmitter.event()
+                                                .data(chunk)
+                                                .name("message"));
+                                    }
+                                    
+                                    if (Boolean.TRUE.equals(data.get("done"))) {
+                                        // 保存 AI 响应到数据库
+                                        ChatHistory assistantMessage = ChatHistory.builder()
+                                                .userId(userId)
+                                                .sessionId(sessionId)
+                                                .role("assistant")
+                                                .content(fullResponse.toString())
+                                                .createdAt(LocalDateTime.now())
+                                                .build();
+                                        chatHistoryMapper.insert(assistantMessage);
+                                        
+                                        // 完成流式传输
+                                        emitter.complete();
+                                    }
+                                }
+                            } catch (IOException e) {
+                                log.error("发送 SSE 数据失败", e);
+                                emitter.completeWithError(e);
+                            }
+                        },
+                        error -> {
+                            log.error("AI 服务流式响应错误", error);
+                            try {
+                                emitter.send(SseEmitter.event()
+                                        .data("{\"error\": \"" + error.getMessage() + "\"}")
+                                        .name("error"));
+                            } catch (IOException e) {
+                                log.error("发送错误信息失败", e);
+                            }
+                            emitter.completeWithError(error);
+                        },
+                        () -> {
+                            // 流完成
+                            if (!emitter.isComplete()) {
+                                emitter.complete();
+                            }
+                        }
+                );
+                
+            } catch (Exception e) {
+                log.error("流式聊天处理失败", e);
+                try {
+                    emitter.send(SseEmitter.event()
+                            .data("{\"error\": \"" + e.getMessage() + "\"}")
+                            .name("error"));
+                } catch (IOException ex) {
+                    log.error("发送错误信息失败", ex);
+                }
+                emitter.completeWithError(e);
+            }
+        });
+        
+        return emitter;
+    }
+    
+    /**
+     * 构建 AI 请求体
+     */
+    private Map<String, Object> buildAiRequest(String message, UserProfile profile, 
+                                                List<MedicalRecord> records, List<ChatHistory> history) {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("message", message);
+        
+        // 添加用户健康档案信息
+        if (profile != null) {
+            Map<String, Object> profileData = new HashMap<>();
+            profileData.put("realName", profile.getRealName());
+            profileData.put("gender", profile.getGender());
+            profileData.put("birthDate", profile.getBirthDate() != null ? profile.getBirthDate().toString() : null);
+            profileData.put("height", profile.getHeight());
+            profileData.put("weight", profile.getWeight());
+            profileData.put("bloodType", profile.getBloodType());
+            profileData.put("allergies", profile.getAllergies());
+            profileData.put("medicalHistory", profile.getMedicalHistory());
+            profileData.put("familyHistory", profile.getFamilyHistory());
+            requestBody.put("userProfile", profileData);
+        }
+        
+        // 添加病历记录信息
+        if (records != null && !records.isEmpty()) {
+            List<Map<String, Object>> recordsData = records.stream()
+                    .map(r -> {
+                        Map<String, Object> record = new HashMap<>();
+                        record.put("id", r.getId());
+                        record.put("title", r.getTitle());
+                        record.put("recordType", r.getRecordType());
+                        record.put("description", r.getDescription());
+                        record.put("hospital", r.getHospital());
+                        record.put("doctor", r.getDoctor());
+                        record.put("recordDate", r.getRecordDate() != null ? r.getRecordDate().toString() : null);
+                        record.put("fileName", r.getFileName());
+                        record.put("imageUrl", r.getFilePath());
+                        return record;
+                    })
+                    .collect(Collectors.toList());
+            requestBody.put("medicalRecords", recordsData);
+        }
+        
+        // 添加对话历史
+        List<Map<String, String>> historyData = history.stream()
+                .map(h -> {
+                    Map<String, String> msg = new HashMap<>();
+                    msg.put("role", h.getRole());
+                    msg.put("content", h.getContent());
+                    return msg;
+                })
+                .collect(Collectors.toList());
+        requestBody.put("history", historyData);
+        
+        return requestBody;
     }
 }
